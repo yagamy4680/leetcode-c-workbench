@@ -1,10 +1,15 @@
 import importlib.util
+import argparse
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
 import subprocess
+import shlex
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('workbench', ROOT / 'runner/workbench.py')
@@ -121,6 +126,34 @@ wb_result_array(argv[2],out,list.count);free(out);wb_list_free(&list);wb_json_fr
         errors=(self.data/'runs'/report['id']/'compile.stderr.log').read_text()
         self.assertIn('solution-master.c:', errors)
         self.assertIn('error:', errors)
+
+    def test_full_command_round_trips_paths_with_spaces_and_json_has_no_ansi(self):
+        self.data = self.data/'workspace with spaces'
+        wb.init(self.data)
+        self.env.update(WB_DATA_DIR=str(self.data), FORCE_COLOR='1')
+        self.code(1480, ARRAY)
+        result, report = self.run_problem(1480,'master','--case','single')
+        events = [json.loads(line) for line in result.stdout.splitlines()]
+        command = next(event for event in events if event['type'] == 'command')
+        self.assertEqual(shlex.split(command['text']), report['command'])
+        self.assertEqual(command['argv'], report['command'])
+        self.assertIn('-fsanitize=address,undefined', command['argv'])
+        self.assertTrue(any('workspace with spaces' in arg for arg in command['argv']))
+        self.assertNotIn('\033', result.stdout)
+        cached, second = self.run_problem(1480,'master','--case','single')
+        self.assertTrue(second['cached'])
+        self.assertFalse(any(json.loads(line)['type'] == 'command' for line in cached.stdout.splitlines()))
+
+    def test_command_color_modes_preserve_the_entire_displayed_command(self):
+        command = {'type':'command','text':"clang -I '/path with spaces' main.c -o program"}
+        args = argparse.Namespace(json_lines=False)
+        for env, tty, colored in (({'TERM':'xterm-256color'},True,True), ({},False,False), ({'FORCE_COLOR':'1'},False,True), ({'FORCE_COLOR':'1','NO_COLOR':''},True,False), ({'FORCE_COLOR':'0'},True,False)):
+            with self.subTest(env=env):
+                output = io.StringIO()
+                with patch.dict(os.environ,env,clear=True), contextlib.redirect_stdout(output), patch.object(output,'isatty',return_value=tty):
+                    wb.emit(args,command)
+                expected = '$ '+command['text']
+                self.assertEqual(output.getvalue(), ('\033[1;36m'+expected+'\033[0m\n') if colored else expected+'\n')
 
     def test_out_of_bounds_is_memory_error(self):
         self.code(1480, 'int* runningSum(int* a,int n,int* s) { int *p=malloc(sizeof(int)); p[n]=a[0]; *s=1; return p; }')

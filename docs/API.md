@@ -73,7 +73,7 @@ curl --netrc-file ~/.netrc-workbench \
 
 Request: `{ "solution": "master", "mode": "debug", "case": "example1", "sourceHash": "..." }`. Omit case for all cases. mode can be debug or perf. sourceHash protects against local edits before the runner captures its source.
 
-Each output line is a JSON event: `start`, `log` (stream/case/text), `message`, `case`, `done` (run report), or `error`. A test failure still uses a successful HTTP response; inspect done.run.status. Connection loss does not cancel the native job; recover the report from History after completion.
+Each output line is a JSON event: `start`, `command` (argv and shell-quoted text, without ANSI), `log` (stream/case/text), `message`, `case`, `done` (run report), or `error`. A test failure still uses a successful HTTP response; inspect done.run.status. Connection loss does not cancel the native job; recover the report from History after completion.
 
 Each case's default timeout is 2000 ms, adjustable from 10–60000 ms. Each process's logs are capped at 2 MiB; the live browser view retains the last 250000 characters, while stored logs can be selected separately.
 

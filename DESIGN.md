@@ -12,10 +12,19 @@ colors:
   line: "#d4dce2"
   problem-hover: "#e7ecf1"
   problem-current: "#dae7f8"
-  editor-paper: "#fafbfd"
-  editor-gutter: "#eef2f5"
-  editor-border: "#b9c7d4"
-  editor-ink: "#20374e"
+  editor-paper: "#192633"
+  editor-gutter: "#131e29"
+  editor-border: "#35465a"
+  editor-ink: "#e1eaf3"
+  editor-muted: "#93a4b5"
+  editor-selection: "rgba(76, 130, 190, .35)"
+  editor-scrollbar-thumb: "#71859b"
+  syntax-keyword: "#c3a6ff"
+  syntax-string: "#a8d5a2"
+  syntax-number: "#f5c47b"
+  syntax-function: "#86c6ff"
+  syntax-operator: "#cfdae5"
+  syntax-macro: "#ffaf9f"
   log-paper: "#192633"
   log-ink: "#e1eaf3"
   passed: "#176344"
@@ -141,11 +150,11 @@ components:
 
 The user-approved Bootstrap utility interface uses an editor-and-results workspace with a compact problem navigator. Operate mode applies throughout: clear action labels, visible state, and readable diagnostics guide the interface. This document describes implemented HTML, CSS, and browser JavaScript; it does not claim browser or visual verification.
 
-The desktop workspace places source and results side by side. Secondary tabs hold test data, the problem description, and history. White surfaces, thin dividers, restrained blue actions, and a dark log panel keep the working material easy to locate. Native dialogs contain import and submission snapshot tasks.
+The desktop workspace places source and results side by side. Secondary tabs hold test data, the problem description, and history. The surrounding utility UI retains white surfaces, thin dividers, and restrained blue actions. The user-requested dark C editor uses syntax colors, and the diagnostic log remains dark. Native dialogs contain import and submission snapshot tasks.
 
 **Key Characteristics:**
 - Compact Bootstrap controls and platform fonts.
-- Source editor and test results share the main workspace.
+- Dark C syntax editor and test results share the main workspace.
 - Explicit labels accompany run, save, and submission states.
 - Logs and long data stay in bounded, scrollable regions.
 - Responsive stacking preserves the same actions on smaller screens.
@@ -155,7 +164,7 @@ The desktop workspace places source and results side by side. Secondary tabs hol
 The palette combines blue actions with cool neutral working surfaces. Frontmatter values are extracted from `web/style.css` and the installed Bootstrap stylesheet.
 
 ### Primary
-- **Accent:** links, primary buttons, outlined primary actions, caret, and control accent.
+- **Accent:** links, primary buttons, outlined primary actions, ordinary field carets, and control accent. The C editor caret uses editor ink.
 - **Accent hover:** filled primary button hover background.
 - **Focus:** custom outlines on plain controls and the editor frame. Bootstrap buttons, fields, and section navigation also retain framework focus treatments.
 
@@ -163,9 +172,19 @@ The palette combines blue actions with cool neutral working surfaces. Frontmatte
 - **Ink / muted:** body text and secondary metadata.
 - **Paper / surface / line:** main canvas, sidebar and utility surfaces, structural dividers.
 - **Problem hover / problem current:** pointer hover and the selected problem.
-- **Editor paper / gutter / border / ink:** source area, line numbers, frame, and code text.
+- **Editor paper / gutter / border / ink / muted:** dark source area, deeper line-number gutter, frame, base code and caret, and gutter/comment text. The rest of the utility UI remains light.
+- **Editor selection / scrollbar thumb:** translucent selection in the highlighted source textarea and its scrollbar thumb; the scrollbar track uses editor gutter.
 - **Log paper / log ink:** compiler and runtime output.
 - **Control border / secondary control:** inherited Bootstrap field borders and secondary outlined actions.
+
+### C syntax colors
+- **Syntax keyword:** C keywords.
+- **Syntax string:** string and character literals.
+- **Syntax number:** numbers and booleans.
+- **Syntax function:** function names.
+- **Syntax operator:** operators and punctuation.
+- **Syntax macro:** macros, directives, and properties.
+- **Editor muted:** comments, sharing the line-number text color.
 
 ### Result and notice colors
 - **Passed / error / pending:** written result states and submission status.
@@ -185,13 +204,13 @@ The type hierarchy is compact and functional. Monospace identifies source, JSON,
 - **Headline:** problem and dialog headings; the mobile problem heading reduces to 21px.
 - **Title:** section and sidebar headings. The sidebar inherits the body line height.
 - **Body:** general text and compact controls. The brand is 18px with a bold product prefix and regular suffix; it reduces to 16px on small screens.
-- **Code:** source and line-number text share the same line height. JSON and snapshot text use the same size with a 1.7 line height.
+- **Code:** source, syntax layer, and line-number text share the same font and line height. Syntax tokens retain normal weight and style. JSON and snapshot text use the same size with a 1.7 line height.
 - **Log:** diagnostic output; case tables and run summaries also use 12px text.
 - **Metadata:** problem metadata and history rows use 13px text; help copy and pane metadata use 12px.
 
 Problem descriptions have a 75ch maximum width and a 1.8 line height. Test timing columns use tabular numerals.
 
-**The Aligned Source Rule.** Keep the source textarea and line-number gutter on the same font, padding, and line height.
+**The Aligned Source Rule.** Keep the source textarea, syntax layer, and line-number gutter on the same font, padding, and line height; synchronize the highlighted layer with textarea scrolling.
 
 ## Layout
 
@@ -231,7 +250,9 @@ The problem list presents an ID/title and a second metadata line. Hover and curr
 
 ### Source editor
 
-A line-number gutter sits beside a plain textarea. The toolbar names the variant and saved state. Tab inserts four spaces; Shift Tab or Escape leaves the editor. Visible keyboard shortcuts save source and run tests. Reload reads local edits from disk; overwrite conflicts and unsaved navigation have visible recovery paths.
+A dark line-number gutter sits beside a real textarea with a Prism C-highlighted layer underneath. Prism provides the syntax markup; the textarea remains the editable source and owns the caret, selection, and scrolling. The highlighted layer is hidden from assistive technology and ignores pointer events. Matching metrics and synchronized horizontal/vertical offsets align both layers with the gutter, including a final empty source row. If Prism is unavailable, the textarea retains readable editor-ink text.
+
+The toolbar names the variant and saved state. Tab inserts four spaces; Shift Tab or Escape leaves the editor. Visible keyboard shortcuts save source and run tests. Reload reads local edits from disk; overwrite conflicts and unsaved navigation have visible recovery paths.
 
 ### Results and diagnostics
 
@@ -246,6 +267,7 @@ Import and submission use native dialogs with labeled controls and visible Close
 ### Do:
 - **Do** preserve the compact Bootstrap control vocabulary and platform font stacks.
 - **Do** keep source, JSON, line numbers, and logs readable in monospace.
+- **Do** keep the solution C editor dark with syntax colors while preserving the light utility UI.
 - **Do** show written states and recovery instructions alongside color.
 - **Do** keep logs, long case details, and tables within scrollable working regions.
 - **Do** preserve the implemented responsive stacking and reduced-motion behavior.

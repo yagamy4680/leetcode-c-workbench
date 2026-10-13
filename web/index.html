@@ -10,6 +10,9 @@
   <link rel="stylesheet" href="/style.css">
   <script src="/vendor/marked.js" defer></script>
   <script src="/vendor/purify.js" defer></script>
+  <script src="/vendor/prism-core.js" data-manual defer></script>
+  <script src="/vendor/prism-clike.js" defer></script>
+  <script src="/vendor/prism-c.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -64,7 +67,13 @@
           <div class="work-area">
             <div class="editor-pane">
               <div class="pane-heading"><label for="code" id="code-label">solution-master.c</label><span class="muted">⌘/Ctrl S · save</span></div>
-              <div class="code-container"><pre id="line-numbers" aria-hidden="true">1</pre><textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="editor-help"></textarea></div>
+              <div class="code-container">
+                <pre id="line-numbers" aria-hidden="true">1</pre>
+                <div id="source-surface" class="source-surface">
+                  <pre id="highlight" aria-hidden="true"><code id="highlight-code" class="language-c"></code></pre>
+                  <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-describedby="editor-help"></textarea>
+                </div>
+              </div>
               <p id="editor-help" class="muted editor-help">Edit here or in your local editor. Reload to pick up local changes. Shift Tab or Escape leaves the editor.</p>
               <button type="button" id="prepare-btn" class="btn btn-sm btn-outline-secondary">Prepare submission snapshot</button>
             </div>

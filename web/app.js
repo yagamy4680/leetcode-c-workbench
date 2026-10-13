@@ -15,10 +15,28 @@ function bind(id, event, action) { $(id).addEventListener(event, e => Promise.re
 function dirty() { return $('code').value !== state.savedCode; }
 function testsDirty() { return $('tests-json').value !== state.savedTests; }
 function navigationBusy() { return state.running || state.preparing || state.loading || state.savingCode || state.savingTests; }
-function lines() { $('line-numbers').textContent = Array.from({ length: $('code').value.split('\n').length }, (_, i) => i + 1).join('\n'); $('saved-state').textContent = dirty() ? 'Unsaved changes' : 'Saved'; }
+function syncEditorScroll() {
+  const editor = $('code');
+  if (editor.clientHeight) $('line-numbers').style.height = `${editor.clientHeight}px`;
+  $('line-numbers').scrollTop = editor.scrollTop;
+  $('highlight-code').style.transform = `translate(${-editor.scrollLeft}px, ${-editor.scrollTop}px)`;
+}
+function highlightCode() {
+  const prism = window.Prism;
+  const enabled = Boolean(prism?.languages?.c);
+  $('source-surface').classList.toggle('highlighted', enabled);
+  if (enabled) {
+    const code = $('code').value;
+    // Retain a final empty row, matching textarea height and line numbering.
+    $('highlight-code').innerHTML = prism.highlight(code + (code.endsWith('\n') ? ' ' : ''), prism.languages.c, 'c');
+  }
+  syncEditorScroll();
+}
+function lines() { $('line-numbers').textContent = Array.from({ length: $('code').value.split('\n').length }, (_, i) => i + 1).join('\n'); $('saved-state').textContent = dirty() ? 'Unsaved changes' : 'Saved'; highlightCode(); }
 function activateTab(tab) {
   document.querySelectorAll('[data-tab]').forEach(button => { const on = button.dataset.tab === tab; button.classList.toggle('active', on); if (on) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current'); });
   for (const name of ['solution', 'tests', 'description', 'history']) $(`${name}-tab`).hidden = name !== tab;
+  if (tab === 'solution') syncEditorScroll();
 }
 function renderProblems() {
   const query = $('search').value.toLowerCase();
@@ -133,6 +151,7 @@ async function runTests() {
       if (item.type === 'error') throw new Error(item.error);
       if (item.type === 'start') state.report = item.run;
       if (item.type === 'log') appendLog(item.text);
+      if (item.type === 'command') appendLog('$ ' + item.text + '\n');
       if (item.type === 'message') $('run-summary').textContent = item.text;
       if (item.type === 'case') { cases.push(item.case); renderCases({ cases }); }
       if (item.type === 'done') { completed = true; showReport(item.run); }
@@ -176,7 +195,7 @@ async function capabilities(refresh = false) {
 bind('search', 'input', renderProblems);
 bind('refresh-btn', 'click', async () => { await refresh(); notice('Problem list refreshed.'); });
 bind('code', 'input', lines);
-bind('code', 'scroll', () => { $('line-numbers').scrollTop = $('code').scrollTop; });
+bind('code', 'scroll', syncEditorScroll);
 bind('code', 'keydown', e => { if (e.key === 'Escape') { e.preventDefault(); $('save-code').focus(); } if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); const start = e.target.selectionStart, end = e.target.selectionEnd; e.target.setRangeText('    ', start, end, 'end'); lines(); } });
 bind('variant', 'change', async () => { const next = $('variant').value; if (navigationBusy()) { $('variant').value = state.variant; return notice('Wait for the current operation to finish.'); } if (dirty() && !confirm('Discard unsaved changes and switch solutions?')) { $('variant').value = state.variant; return; } await loadCode(next); });
 bind('reload-code', 'click', async () => { if (navigationBusy()) return notice('Wait for the current operation to finish.'); if (!dirty() || confirm('Discard browser changes and reload from disk?')) await loadCode(); });
@@ -209,4 +228,5 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => { if (!(e.metaKey || e.ctrlKey) || !state.problem || document.querySelector('dialog[open]')) return; if (e.key === 's' && !$('solution-tab').hidden) { e.preventDefault(); saveCode().catch(error => notice(error.message, true)); } if (e.key === 'Enter') { e.preventDefault(); runTests().catch(error => notice(error.message, true)); } });
 window.addEventListener('beforeunload', e => { if (dirty() || testsDirty()) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('resize', syncEditorScroll);
 refresh().catch(error => { $('problems').innerHTML = '<p class="muted">Could not load problems. Use Refresh to try again.</p>'; notice(error.message, true); });

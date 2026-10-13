@@ -52,10 +52,24 @@ h3 { font-size: 16px; font-weight: 650; margin: 0; }
 .editor-pane, .results-pane { min-width: 0; }
 .pane-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 30px; font-size: 12px; margin-bottom: 8px; }
 .pane-heading label { font-size: 13px; font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.code-container { display: flex; border: 1px solid #b9c7d4; border-radius: 6px; overflow: hidden; background: #fafbfd; height: max(380px, calc(100vh - 370px)); }
-#line-numbers, #code { padding: 14px 10px; margin: 0; font: 13px/21px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-#line-numbers { text-align: right; color: var(--muted); background: #eef2f5; min-width: 42px; overflow: hidden; user-select: none; }
-#code { flex: 1; border: 0; outline: none; resize: none; background: transparent; color: #20374e; width: 100%; tab-size: 4; white-space: pre; overflow: auto; }
+.code-container { display: flex; border: 1px solid #35465a; border-radius: 6px; overflow: hidden; background: #192633; height: max(380px, calc(100vh - 370px)); color-scheme: dark; }
+.source-surface { position: relative; flex: 1; min-width: 0; height: 100%; }
+#line-numbers, #code, #highlight, #highlight-code { padding: 14px 10px; margin: 0; font: 13px/21px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: normal; tab-size: 4; white-space: pre; }
+#line-numbers { text-align: right; color: #93a4b5; background: #131e29; min-width: 42px; overflow: hidden; user-select: none; }
+#code { position: absolute; inset: 0; border: 0; outline: none; resize: none; background: transparent; color: #e1eaf3; caret-color: #e1eaf3; width: 100%; height: 100%; overflow: auto; scrollbar-color: #71859b #131e29; }
+#highlight { display: none; position: absolute; inset: 0; overflow: hidden; color: #e1eaf3; pointer-events: none; }
+#highlight-code { display: block; padding: 0; width: max-content; min-width: 100%; color: inherit; }
+.source-surface.highlighted #highlight { display: block; }
+.source-surface.highlighted #code { color: transparent; -webkit-text-fill-color: transparent; }
+.source-surface.highlighted #code::selection { background: rgba(76, 130, 190, .35); color: transparent; }
+#highlight .token { font-weight: normal; font-style: normal; }
+#highlight .token.comment { color: #93a4b5; }
+#highlight .token.keyword { color: #c3a6ff; }
+#highlight .token.string, #highlight .token.char { color: #a8d5a2; }
+#highlight .token.number, #highlight .token.boolean { color: #f5c47b; }
+#highlight .token.function { color: #86c6ff; }
+#highlight .token.operator, #highlight .token.punctuation { color: #cfdae5; }
+#highlight .token.macro, #highlight .token.directive, #highlight .token.property { color: #ffaf9f; }
 .code-container:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 .editor-help { font-size: 12px; margin: 10px 0; }
 .run-controls { margin-bottom: 10px; }

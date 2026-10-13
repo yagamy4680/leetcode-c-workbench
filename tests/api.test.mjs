@@ -32,7 +32,7 @@ test('all application endpoints require authentication',async()=>{
   assert.equal((await fetch(base+'/api/problems')).status,401);
   assert.equal((await fetch(base+'/')).status,401);
   assert.equal((await request('/api/health')).status,200);
-  for(const file of ['/','/app.js','/style.css','/utilities.css','/vendor/bootstrap.css','/vendor/marked.js','/vendor/purify.js']) assert.equal((await request(file)).status,200,file);
+  for(const file of ['/','/app.js','/style.css','/utilities.css','/vendor/bootstrap.css','/vendor/marked.js','/vendor/purify.js','/vendor/prism-core.js','/vendor/prism-clike.js','/vendor/prism-c.js']) assert.equal((await request(file)).status,200,file);
 });
 test('source edits preserve local changes with compare-and-swap',async()=>{
   const current=await(await request('/api/problems/1480/solutions/master')).json();

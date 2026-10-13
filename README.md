@@ -70,6 +70,10 @@ Debug 預設使用 GNU11、`-O1 -g`、warnings、ASan／UBSan 和 frame pointers
 
 比對支援 `exact`、`unordered`（僅最外層 array，保留重複元素）與 `float`（可設定 tolerance）。`input` 必須符合該題 driver 所需欄位。
 
+實際編譯前，CLI 會完整顯示 compiler executable、flags、sources、headers 和輸出路徑，並正確引用含空白的路徑。Terminal 用粗體 cyan 區分指令；redirect／pipe 使用純文字。可用 `FORCE_COLOR=1` 強制上色、`NO_COLOR=1` 關閉。JSON event stream 保持無 ANSI，網頁 Live output 也會顯示編譯指令。重用快取時不會顯示未執行的編譯指令。
+
+網頁的所有 `solution-*.c` 編輯器使用深色 C syntax highlighting，包含 keyword、comment、string、number 和 function；仍使用原生 textarea 編輯與複製，行號、水平／垂直捲動及錯誤行定位保留。Prism 和 C grammar 由本機服務提供，不依賴 CDN。
+
 Actual answer 寫入獨立 JSON 檔；stdout／stderr 都留作 log，因此可以直接使用 `printf()` 除錯。預設設定 unbuffered output。結果區分編譯失敗、wrong answer、memory error、memory leak、undefined behavior、runtime error、driver error、timeout 和 output limit。
 
 每次 run 保留 source 副本與 hash。網頁的 Tested source 可查看實際測試版本，錯誤行號按鈕在 editor 版本相符時可跳到該行。也可以直接使用 LLDB：

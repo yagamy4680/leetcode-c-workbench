@@ -5,6 +5,11 @@ import fs from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { marked } from 'marked';
 import createDOMPurify from 'dompurify';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const Prism = require('prismjs/components/prism-core');
+require('prismjs/components/prism-clike');
+require('prismjs/components/prism-c');
 
 const html=fs.readFileSync('web/index.html','utf8');
 const source=fs.readFileSync('web/app.js','utf8');
@@ -14,7 +19,7 @@ function problem(id=1480,extra={}) { return {id,title:`Problem ${id}`,difficulty
 function response(value) { return new Response(typeof value==='string'?value:JSON.stringify(value),{status:200}); }
 async function harness(handler=()=>undefined) {
   const dom=new JSDOM(html,{runScripts:'outside-only',url:'http://127.0.0.1:3089/'}),w=dom.window,calls=[];
-  w.marked=marked;w.DOMPurify=createDOMPurify(w);w.confirm=()=>true;
+  w.marked=marked;w.DOMPurify=createDOMPurify(w);w.confirm=()=>true;w.Prism=Prism;
   w.TextDecoder=TextDecoder;
   w.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
   w.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
@@ -26,7 +31,7 @@ async function harness(handler=()=>undefined) {
     if(route.endsWith('/solutions/master'))return response({code:'initial',hash:'source-hash'});
     throw new Error(`Unexpected request ${call.method} ${route}`);
   };
-  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog};');
+  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode};');
   await pause();await w.hooks.loadProblem(1480);
   return {w,calls,$:id=>w.document.getElementById(id),close:()=>w.close()};
 }
@@ -91,4 +96,40 @@ test('failed source loading preserves the previous problem and editor together',
 test('import navigation is blocked during an active run',async()=>{
   const h=await harness();h.w.hooks.state.running=true;h.$('import-btn').click();await pause();
   assert.equal(h.$('import-dialog').hasAttribute('open'),false);h.close();
+});
+test('C highlighting preserves editable source, final newlines and safe HTML',async()=>{
+  const h=await harness();
+  const code='#include <stdio.h>\n// </code><script>bad()</script>\nint main(void) { printf("Hello"); return 42; }\n';
+  h.$('code').value=code;h.$('code').dispatchEvent(new h.w.Event('input',{bubbles:true}));
+  assert.equal(h.$('code').value,code);
+  assert.equal(h.$('highlight-code').textContent,code+' ');
+  assert.ok(h.$('highlight-code').querySelector('.token.keyword'));
+  assert.ok(h.$('highlight-code').querySelector('.token.comment'));
+  assert.ok(h.$('highlight-code').querySelector('.token.string'));
+  assert.ok(h.$('highlight-code').querySelector('.token.number'));
+  assert.equal(h.$('highlight-code').querySelector('script'),null);
+  assert.equal(h.$('highlight').getAttribute('aria-hidden'),'true');
+  assert.equal(h.$('source-surface').classList.contains('highlighted'),true);h.close();
+});
+test('highlight and gutter follow both scroll axes without clamping text',async()=>{
+  const h=await harness();const editor=h.$('code');
+  Object.defineProperty(editor,'clientHeight',{value:240});
+  editor.scrollLeft=80;editor.scrollTop=210;editor.dispatchEvent(new h.w.Event('scroll'));
+  assert.equal(h.$('highlight-code').style.transform,'translate(-80px, -210px)');
+  assert.equal(h.$('line-numbers').scrollTop,210);
+  assert.equal(h.$('line-numbers').style.height,'240px');h.close();
+});
+test('missing highlighter retains the readable textarea fallback',async()=>{
+  const h=await harness();h.w.Prism=undefined;h.w.hooks.highlightCode();
+  assert.equal(h.$('source-surface').classList.contains('highlighted'),false);
+  assert.equal(h.$('code').value,'initial');h.close();
+});
+test('Tab insertion refreshes tokens and saving uses exact textarea source',async()=>{
+  const h=await harness(call=>call.method==='PUT'?response({hash:'saved'}):undefined);
+  h.$('code').value='int x = 42;';h.$('code').setSelectionRange(0,0);
+  h.$('code').dispatchEvent(new h.w.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
+  assert.equal(h.$('code').value,'    int x = 42;');
+  assert.equal(h.$('highlight-code').textContent,h.$('code').value);
+  await h.w.hooks.saveCode();
+  assert.equal(h.calls.find(c=>c.method==='PUT').body.code,'    int x = 42;');h.close();
 });

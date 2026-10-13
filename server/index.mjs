@@ -67,6 +67,9 @@ export async function createApp(db = createDatabaseClient()) {
   app.get('/vendor/bootstrap.css', (req, res) => res.sendFile(path.join(appDir, 'node_modules/bootstrap/dist/css/bootstrap.min.css')));
   app.get('/vendor/marked.js', (req, res) => res.sendFile(path.join(appDir, 'node_modules/marked/lib/marked.umd.js')));
   app.get('/vendor/purify.js', (req, res) => res.sendFile(path.join(appDir, 'node_modules/dompurify/dist/purify.min.js')));
+  for (const language of ['core', 'clike', 'c']) {
+    app.get(`/vendor/prism-${language}.js`, (req, res) => res.sendFile(path.join(appDir, `node_modules/prismjs/components/prism-${language}.min.js`)));
+  }
   app.use(express.static(path.join(appDir, 'web')));
   app.get('/api/health', (req, res) => res.json({ ok: true }));
   app.get('/api/doctor', async (req, res) => res.json(await runCommand(['doctor', ...(req.query.refresh === '1' ? ['--refresh'] : [])])));

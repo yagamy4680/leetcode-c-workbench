@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-13T17:31:18.828578Z",
+  "generatedAt": "2026-10-13T18:33:35.665897Z",
   "title": "Design System: LeetCode C Workbench",
   "extensions": {
     "colorMeta": {
@@ -148,56 +148,56 @@
         "role": "neutral",
         "displayName": "Editor Paper",
         "tonalRamp": [
-          "oklch(15% 0.0029 264.54)",
-          "oklch(26% 0.0029 264.54)",
-          "oklch(38% 0.0029 264.54)",
-          "oklch(49% 0.0029 264.54)",
-          "oklch(61% 0.0029 264.54)",
-          "oklch(72% 0.0029 264.54)",
-          "oklch(84% 0.0029 264.54)",
-          "oklch(95% 0.0029 264.54)"
+          "oklch(15% 0.0304 249.05)",
+          "oklch(26% 0.0304 249.05)",
+          "oklch(38% 0.0304 249.05)",
+          "oklch(49% 0.0304 249.05)",
+          "oklch(61% 0.0304 249.05)",
+          "oklch(72% 0.0304 249.05)",
+          "oklch(84% 0.0304 249.05)",
+          "oklch(95% 0.0304 249.05)"
         ]
       },
       "editor-gutter": {
         "role": "neutral",
         "displayName": "Editor Gutter",
         "tonalRamp": [
-          "oklch(15% 0.0059 239.82)",
-          "oklch(26% 0.0059 239.82)",
-          "oklch(38% 0.0059 239.82)",
-          "oklch(49% 0.0059 239.82)",
-          "oklch(61% 0.0059 239.82)",
-          "oklch(72% 0.0059 239.82)",
-          "oklch(84% 0.0059 239.82)",
-          "oklch(95% 0.0059 239.82)"
+          "oklch(15% 0.0266 249.05)",
+          "oklch(26% 0.0266 249.05)",
+          "oklch(38% 0.0266 249.05)",
+          "oklch(49% 0.0266 249.05)",
+          "oklch(61% 0.0266 249.05)",
+          "oklch(72% 0.0266 249.05)",
+          "oklch(84% 0.0266 249.05)",
+          "oklch(95% 0.0266 249.05)"
         ]
       },
       "editor-border": {
         "role": "neutral",
         "displayName": "Editor Border",
         "tonalRamp": [
-          "oklch(15% 0.0239 246.09)",
-          "oklch(26% 0.0239 246.09)",
-          "oklch(38% 0.0239 246.09)",
-          "oklch(49% 0.0239 246.09)",
-          "oklch(61% 0.0239 246.09)",
-          "oklch(72% 0.0239 246.09)",
-          "oklch(84% 0.0239 246.09)",
-          "oklch(95% 0.0239 246.09)"
+          "oklch(15% 0.0406 252.88)",
+          "oklch(26% 0.0406 252.88)",
+          "oklch(38% 0.0406 252.88)",
+          "oklch(49% 0.0406 252.88)",
+          "oklch(61% 0.0406 252.88)",
+          "oklch(72% 0.0406 252.88)",
+          "oklch(84% 0.0406 252.88)",
+          "oklch(95% 0.0406 252.88)"
         ]
       },
       "editor-ink": {
         "role": "neutral",
         "displayName": "Editor Ink",
         "tonalRamp": [
-          "oklch(15% 0.0503 249.58)",
-          "oklch(26% 0.0503 249.58)",
-          "oklch(38% 0.0503 249.58)",
-          "oklch(49% 0.0503 249.58)",
-          "oklch(61% 0.0503 249.58)",
-          "oklch(72% 0.0503 249.58)",
-          "oklch(84% 0.0503 249.58)",
-          "oklch(95% 0.0503 249.58)"
+          "oklch(15% 0.0156 247.99)",
+          "oklch(26% 0.0156 247.99)",
+          "oklch(38% 0.0156 247.99)",
+          "oklch(49% 0.0156 247.99)",
+          "oklch(61% 0.0156 247.99)",
+          "oklch(72% 0.0156 247.99)",
+          "oklch(84% 0.0156 247.99)",
+          "oklch(95% 0.0156 247.99)"
         ]
       },
       "log-paper": {
@@ -353,6 +353,132 @@
           "oklch(84% 0.0165 244.89)",
           "oklch(95% 0.0165 244.89)"
         ]
+      },
+      "editor-muted": {
+        "role": "neutral",
+        "displayName": "Editor Muted",
+        "tonalRamp": [
+          "oklch(15% 0.0314 248.27)",
+          "oklch(26% 0.0314 248.27)",
+          "oklch(38% 0.0314 248.27)",
+          "oklch(49% 0.0314 248.27)",
+          "oklch(61% 0.0314 248.27)",
+          "oklch(72% 0.0314 248.27)",
+          "oklch(84% 0.0314 248.27)",
+          "oklch(95% 0.0314 248.27)"
+        ]
+      },
+      "syntax-keyword": {
+        "role": "neutral",
+        "displayName": "Syntax Keyword",
+        "tonalRamp": [
+          "oklch(15% 0.1272 298.41)",
+          "oklch(26% 0.1272 298.41)",
+          "oklch(38% 0.1272 298.41)",
+          "oklch(49% 0.1272 298.41)",
+          "oklch(61% 0.1272 298.41)",
+          "oklch(72% 0.1272 298.41)",
+          "oklch(84% 0.1272 298.41)",
+          "oklch(95% 0.1272 298.41)"
+        ]
+      },
+      "syntax-string": {
+        "role": "neutral",
+        "displayName": "Syntax String",
+        "tonalRamp": [
+          "oklch(15% 0.0845 141.73)",
+          "oklch(26% 0.0845 141.73)",
+          "oklch(38% 0.0845 141.73)",
+          "oklch(49% 0.0845 141.73)",
+          "oklch(61% 0.0845 141.73)",
+          "oklch(72% 0.0845 141.73)",
+          "oklch(84% 0.0845 141.73)",
+          "oklch(95% 0.0845 141.73)"
+        ]
+      },
+      "syntax-number": {
+        "role": "neutral",
+        "displayName": "Syntax Number",
+        "tonalRamp": [
+          "oklch(15% 0.1067 76.48)",
+          "oklch(26% 0.1067 76.48)",
+          "oklch(38% 0.1067 76.48)",
+          "oklch(49% 0.1067 76.48)",
+          "oklch(61% 0.1067 76.48)",
+          "oklch(72% 0.1067 76.48)",
+          "oklch(84% 0.1067 76.48)",
+          "oklch(95% 0.1067 76.48)"
+        ]
+      },
+      "syntax-function": {
+        "role": "neutral",
+        "displayName": "Syntax Function",
+        "tonalRamp": [
+          "oklch(15% 0.1044 246.41)",
+          "oklch(26% 0.1044 246.41)",
+          "oklch(38% 0.1044 246.41)",
+          "oklch(49% 0.1044 246.41)",
+          "oklch(61% 0.1044 246.41)",
+          "oklch(72% 0.1044 246.41)",
+          "oklch(84% 0.1044 246.41)",
+          "oklch(95% 0.1044 246.41)"
+        ]
+      },
+      "syntax-operator": {
+        "role": "neutral",
+        "displayName": "Syntax Operator",
+        "tonalRamp": [
+          "oklch(15% 0.0193 248.05)",
+          "oklch(26% 0.0193 248.05)",
+          "oklch(38% 0.0193 248.05)",
+          "oklch(49% 0.0193 248.05)",
+          "oklch(61% 0.0193 248.05)",
+          "oklch(72% 0.0193 248.05)",
+          "oklch(84% 0.0193 248.05)",
+          "oklch(95% 0.0193 248.05)"
+        ]
+      },
+      "syntax-macro": {
+        "role": "neutral",
+        "displayName": "Syntax Macro",
+        "tonalRamp": [
+          "oklch(15% 0.0973 31.73)",
+          "oklch(26% 0.0973 31.73)",
+          "oklch(38% 0.0973 31.73)",
+          "oklch(49% 0.0973 31.73)",
+          "oklch(61% 0.0973 31.73)",
+          "oklch(72% 0.0973 31.73)",
+          "oklch(84% 0.0973 31.73)",
+          "oklch(95% 0.0973 31.73)"
+        ]
+      },
+      "editor-selection": {
+        "role": "neutral",
+        "displayName": "Editor Selection",
+        "tonalRamp": [
+          "oklch(15% 0.1089 252.34 / 0.35)",
+          "oklch(26% 0.1089 252.34 / 0.35)",
+          "oklch(38% 0.1089 252.34 / 0.35)",
+          "oklch(49% 0.1089 252.34 / 0.35)",
+          "oklch(61% 0.1089 252.34 / 0.35)",
+          "oklch(72% 0.1089 252.34 / 0.35)",
+          "oklch(84% 0.1089 252.34 / 0.35)",
+          "oklch(95% 0.1089 252.34 / 0.35)"
+        ]
+      },
+      "editor-scrollbar-thumb": {
+        "role": "neutral",
+        "displayName": "Editor Scrollbar Thumb",
+        "tonalRamp": [
+          "oklch(15% 0.0408 250.96)",
+          "oklch(26% 0.0408 250.96)",
+          "oklch(38% 0.0408 250.96)",
+          "oklch(49% 0.0408 250.96)",
+          "oklch(61% 0.0408 250.96)",
+          "oklch(72% 0.0408 250.96)",
+          "oklch(84% 0.0408 250.96)",
+          "oklch(95% 0.0408 250.96)"
+        ]
       }
     },
     "typographyMeta": {
@@ -478,9 +604,9 @@
       "name": "Source editor",
       "kind": "custom",
       "refersTo": "code-editor",
-      "description": "Shared frame keeps source and gutter aligned.",
-      "html": "<div class=\"ds-editor\"><pre class=\"ds-gutter\" aria-hidden=\"true\">1\n2\n3</pre><textarea class=\"ds-code\" aria-label=\"Solution source\" spellcheck=\"false\">int answer(void) {\n    return 42;\n}</textarea></div>",
-      "css": ".ds-editor{display:flex;border:1px solid #b9c7d4;border-radius:6px;overflow:hidden;background:#fafbfd;height:max(380px,calc(100vh - 370px))}.ds-gutter,.ds-code{font:13px/21px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:14px 10px;margin:0}.ds-gutter{text-align:right;background:#eef2f5;color:var(--muted,#536472);min-width:42px;overflow:hidden;user-select:none}.ds-code{flex:1;border:0;outline:none;resize:none;background:transparent;color:#20374e;width:100%;tab-size:4;white-space:pre;overflow:auto}.ds-editor:focus-within{outline:2px solid var(--focus,#1c5cb4);outline-offset:2px}"
+      "description": "Dark C editor with a static preview of Prism-rendered syntax beneath the real textarea.",
+      "html": "<div class=\"ds-editor\"><pre class=\"ds-gutter\" aria-hidden=\"true\">1\n2\n3</pre><div class=\"ds-source\"><pre class=\"ds-highlight\" aria-hidden=\"true\"><code class=\"ds-highlight-code\"><span class=\"ds-keyword\">int</span> <span class=\"ds-function\">answer</span><span class=\"ds-operator\">(</span><span class=\"ds-keyword\">void</span><span class=\"ds-operator\">) {</span>\n    <span class=\"ds-keyword\">return</span> <span class=\"ds-number\">42</span><span class=\"ds-operator\">;</span>\n<span class=\"ds-operator\">}</span></code></pre><textarea class=\"ds-code\" aria-label=\"Solution source preview\" spellcheck=\"false\" wrap=\"off\" readonly>int answer(void) {\n    return 42;\n}</textarea></div></div>",
+      "css": ".ds-editor{display:flex;border:1px solid #35465a;border-radius:6px;overflow:hidden;background:#192633;height:max(380px,calc(100vh - 370px));color-scheme:dark}.ds-source{position:relative;flex:1;min-width:0;height:100%}.ds-gutter,.ds-code,.ds-highlight,.ds-highlight-code{padding:14px 10px;margin:0;font:13px/21px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:normal;tab-size:4;white-space:pre}.ds-gutter{text-align:right;color:#93a4b5;background:#131e29;min-width:42px;overflow:hidden;user-select:none}.ds-code{position:absolute;inset:0;border:0;outline:none;resize:none;background:transparent;color:transparent;-webkit-text-fill-color:transparent;caret-color:#e1eaf3;width:100%;height:100%;overflow:auto;scrollbar-color:#71859b #131e29}.ds-highlight{position:absolute;inset:0;overflow:hidden;color:#e1eaf3;pointer-events:none}.ds-highlight-code{display:block;padding:0;width:max-content;min-width:100%;color:inherit}.ds-code::selection{background:rgba(76,130,190,.35);color:transparent}.ds-highlight span{font-weight:normal;font-style:normal}.ds-comment{color:#93a4b5}.ds-keyword{color:#c3a6ff}.ds-string,.ds-char{color:#a8d5a2}.ds-number,.ds-boolean{color:#f5c47b}.ds-function{color:#86c6ff}.ds-operator,.ds-punctuation{color:#cfdae5}.ds-macro,.ds-directive,.ds-property{color:#ffaf9f}.ds-editor:focus-within{outline:2px solid var(--focus,#1c5cb4);outline-offset:2px}@media(max-width:1150px){.ds-editor{height:390px}}"
     },
     {
       "name": "Runtime log",
@@ -501,10 +627,10 @@
   ],
   "narrative": {
     "northStar": "A familiar source editor",
-    "overview": "The user-approved Bootstrap utility interface uses an editor-and-results workspace with a compact problem navigator. Operate mode applies throughout: clear action labels, visible state, and readable diagnostics guide the interface. This document describes implemented HTML, CSS, and browser JavaScript; it does not claim browser or visual verification.\n\nThe desktop workspace places source and results side by side. Secondary tabs hold test data, the problem description, and history. White surfaces, thin dividers, restrained blue actions, and a dark log panel keep the working material easy to locate. Native dialogs contain import and submission snapshot tasks.",
+    "overview": "The user-approved Bootstrap utility interface uses an editor-and-results workspace with a compact problem navigator. Operate mode applies throughout: clear action labels, visible state, and readable diagnostics guide the interface. This document describes implemented HTML, CSS, and browser JavaScript; it does not claim browser or visual verification.\n\nThe desktop workspace places source and results side by side. Secondary tabs hold test data, the problem description, and history. The surrounding utility UI retains white surfaces, thin dividers, and restrained blue actions. The user-requested dark C editor uses syntax colors, and the diagnostic log remains dark. Native dialogs contain import and submission snapshot tasks.",
     "keyCharacteristics": [
       "Compact Bootstrap controls and platform fonts.",
-      "Source editor and test results share the main workspace.",
+      "Dark C syntax editor and test results share the main workspace.",
       "Explicit labels accompany run, save, and submission states.",
       "Logs and long data stay in bounded, scrollable regions.",
       "Responsive stacking preserves the same actions on smaller screens."
@@ -517,7 +643,7 @@
       },
       {
         "name": "The Aligned Source Rule",
-        "body": "Keep the source textarea and line-number gutter on the same font, padding, and line height.",
+        "body": "Keep the source textarea, syntax layer, and line-number gutter on the same font, padding, and line height; synchronize the highlighted layer with textarea scrolling.",
         "section": "typography"
       },
       {
@@ -529,6 +655,7 @@
     "dos": [
       "Do preserve the compact Bootstrap control vocabulary and platform font stacks.",
       "Do keep source, JSON, line numbers, and logs readable in monospace.",
+      "Do keep the solution C editor dark with syntax colors while preserving the light utility UI.",
       "Do show written states and recovery instructions alongside color.",
       "Do keep logs, long case details, and tables within scrollable working regions.",
       "Do preserve the implemented responsive stacking and reduced-motion behavior."

@@ -146,6 +146,13 @@ def compiler():
 def emit(args, event):
     if getattr(args, 'json_lines', False):
         print(json.dumps(event, ensure_ascii=False), flush=True)
+    elif event['type'] == 'command':
+        # Keep redirected output plain; allow the conventional color overrides.
+        force = os.environ.get('FORCE_COLOR')
+        colored = ('NO_COLOR' not in os.environ and force != '0' and
+                   (bool(force) or (sys.stdout.isatty() and os.environ.get('TERM') != 'dumb')))
+        text = '$ ' + event['text']
+        print(f'\033[1;36m{text}\033[0m' if colored else text, flush=True)
     elif event['type'] == 'log':
         print(event['text'], end='', flush=True)
     elif event['type'] == 'case':
@@ -338,6 +345,7 @@ def run(data, args):
             command = [cc, *flags, '-I', str(runtime), '-I', str(source), '-include', str(source / 'solution.h'),
                        *(str(source / s) for s in sources), str(source / f'solution-{args.solution}.c'), str(runtime / 'wb.c'), '-lm', '-o', str(pending)]
             report['command'] = command
+            emit(args, {'type': 'command', 'argv': command, 'text': shlex.join(command)})
             code, reason, _ = execute(command, folder, 'compile', 30, env, args)
             if code != 0 or reason:
                 report['status'] = 'compile_error'

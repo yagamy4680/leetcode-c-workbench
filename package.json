@@ -20,7 +20,8 @@
     "dompurify": "3.4.17",
     "dotenv": "17.2.3",
     "express": "5.1.0",
-    "marked": "17.0.1"
+    "marked": "17.0.1",
+    "prismjs": "1.30.0"
   },
   "devDependencies": {
     "@tailwindcss/cli": "4.3.3",
