@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { execFileSync } from 'node:child_process';
-import { appDir, dataDir, python } from '../server/config.mjs';
+import { appDir, dataDir, databaseFile } from '../server/config.mjs';
+import { initializeDatabase } from '../server/database.mjs';
 
 fs.mkdirSync(dataDir, { recursive: true });
 const envFile = path.join(appDir, '.env');
@@ -15,8 +15,7 @@ for (const [key, value] of Object.entries({ WB_USER: process.env.WB_USER || 'wor
 }
 fs.writeFileSync(envFile, env, { mode: 0o600 });
 fs.chmodSync(envFile, 0o600);
-execFileSync(python, [path.join(appDir, 'runner/workbench.py'), 'init'], { stdio: 'inherit', env: process.env });
-// Create the file through the host first; some sandboxed schema engines cannot.
-execFileSync(python, ['-c', 'import sqlite3,sys; sqlite3.connect(sys.argv[1]).close()', path.join(dataDir, 'workbench.db')], { stdio: 'inherit' });
-execFileSync(process.execPath, [path.join(appDir, 'node_modules/prisma/build/index.js'), 'db', 'push', '--skip-generate'], { cwd: appDir, stdio: 'inherit', env: process.env });
+console.log(`Workspace: ${dataDir}`);
+console.log(`SQLite database: ${databaseFile}`);
+initializeDatabase();
 console.log('Setup complete. Local credentials are in .env. Start with npm start.');

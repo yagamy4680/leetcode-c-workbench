@@ -4,8 +4,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { PrismaClient } from '@prisma/client';
-import { appDir, dataDir, python, host, port, requireCredentials } from './config.mjs';
+import { appDir, dataDir, databaseFile, python, host, port, requireCredentials } from './config.mjs';
+import { createDatabaseClient, ensureDatabase } from './database.mjs';
 import { HttpError, hash, readJSON, name, problemDir, ownedFile, solutionFile, atomic, saveChecked, validateTests, importBundle } from './workspace.mjs';
 import { createIndexer, syncProblem } from './indexer.mjs';
 
@@ -33,12 +33,18 @@ function runCommand(args) {
   });
 }
 
-export async function createApp(db = new PrismaClient()) {
+export async function createApp(db = createDatabaseClient()) {
   requireCredentials();
   const sync = createIndexer(db);
-  await db.$queryRawUnsafe('PRAGMA journal_mode = WAL');
-  await db.$queryRawUnsafe('PRAGMA busy_timeout = 5000');
-  await sync();
+  try {
+    await ensureDatabase(db);
+    await db.$queryRawUnsafe('PRAGMA journal_mode = WAL');
+    await db.$queryRawUnsafe('PRAGMA busy_timeout = 5000');
+    await sync();
+  } catch (error) {
+    await db.$disconnect();
+    throw error;
+  }
   const app = express();
   app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -188,7 +194,14 @@ export async function createApp(db = new PrismaClient()) {
 }
 
 if (process.argv[1] === path.join(appDir, 'server/index.mjs')) {
-  const { app, close } = await createApp();
-  const server = app.listen(port, host, () => console.log(`LeetCode C Workbench listening at http://${host}:${port}`));
-  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => server.close(async () => { await close(); process.exit(0); }));
+  try {
+    const { app, close } = await createApp();
+    console.log(`Workspace: ${dataDir}`);
+    console.log(`SQLite database: ${databaseFile}`);
+    const server = app.listen(port, host, () => console.log(`LeetCode C Workbench listening at http://${host}:${port}`));
+    for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => server.close(async () => { await close(); process.exit(0); }));
+  } catch (error) {
+    console.error(`Startup failed: ${error.message}`);
+    process.exitCode = 1;
+  }
 }

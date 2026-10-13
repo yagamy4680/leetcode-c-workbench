@@ -32,7 +32,8 @@ def configure():
             key, value = line.split('=', 1)
             parts = shlex.split(value, comments=True)
             os.environ.setdefault(key.strip(), ' '.join(parts))
-    data = Path(os.environ.get('WB_DATA_DIR', '~/leetcode-workspace')).expanduser().resolve()
+    configured = Path(os.environ.get('WB_DATA_DIR', '~/leetcode-workspace')).expanduser()
+    data = (configured if configured.is_absolute() else APP / configured).resolve()
     if data == APP or APP in data.parents:
         raise ValueError('WB_DATA_DIR must be outside the public application repository.')
     return data

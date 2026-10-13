@@ -22,6 +22,10 @@ npm start
 
 初始題目為 **1480、783、589**，`solution-master.c` 是 TODO 框架，測試失敗代表尚未實作。附件中的 Minimum Distance Between BST Nodes URL 對應 **783**；等價的 530 使用不同函式名稱。
 
+服務啟動時會顯示實際 workspace 與 SQLite 路徑，並在開始監聽前檢查四個必要資料表。空資料庫會自動初始化及補入缺少的範例題目；已有解法會保留。非空資料庫若缺少資料表，會停止並提示檢查路徑及執行 `npm run setup`，不會自動重設資料。
+
+若出現 `P2021: main.Problem does not exist`，先停止服務，執行 `npm run setup` 後重新啟動，確認兩者輸出的 SQLite 路徑相同。預設檔案是 `$WB_DATA_DIR/workbench.db`。需要自訂時可設定 SQLite `DATABASE_URL`；setup 和 runtime 使用同一個正規化的絕對路徑。相對 `DATABASE_URL` 以 `prisma/` 為基準，相對 `WB_DATA_DIR` 以 application checkout 為基準，不受啟動 cwd 影響。
+
 ## 本機操作
 
 題目位於 `$WB_DATA_DIR/problems/<id>/`。使用任何 editor 編輯 `solution-master.c`，或從網頁編輯。
