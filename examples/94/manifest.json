@@ -1,0 +1,18 @@
+{
+  "id": 94,
+  "title": "Binary Tree Inorder Traversal",
+  "slug": "binary-tree-inorder-traversal",
+  "difficulty": "Easy",
+  "topics": [
+    "Tree",
+    "Depth-First Search",
+    "Binary Tree",
+    "Stack"
+  ],
+  "url": "https://leetcode.com/problems/binary-tree-inorder-traversal/description/",
+  "sources": [
+    "main.c"
+  ],
+  "headers": [],
+  "signature": "int* inorderTraversal(struct TreeNode* root, int* returnSize);"
+}

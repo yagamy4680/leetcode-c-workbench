@@ -34,7 +34,7 @@ function fixture(action) {
 test('fresh startup initializes schema and examples before accepting queries', () => fixture(temp => {
   const data = path.join(temp, 'workspace with spaces');
   const result = runNode(start, fixtureEnv(data), temp);
-  assert.equal(result.count, 3);
+  assert.equal(result.count, 4);
   assert.equal(result.databaseFile, path.join(data, 'workbench.db'));
   assert.ok(fs.existsSync(result.databaseFile));
 }));
@@ -48,7 +48,7 @@ test('an existing empty database is initialized without overwriting solutions', 
   fs.cpSync(path.join(root, 'examples', '1480'), problem, { recursive: true });
   const solution = path.join(problem, 'solution-master.c');
   fs.writeFileSync(solution, '/* existing personal solution */');
-  assert.equal(runNode(start, fixtureEnv(data), temp).count, 3);
+  assert.equal(runNode(start, fixtureEnv(data), temp).count, 4);
   assert.equal(fs.readFileSync(solution, 'utf8'), '/* existing personal solution */');
 }));
 
@@ -80,7 +80,7 @@ test('setup and runtime use the same custom database; restarts preserve records'
     await app.close();
   `, env, temp);
   assert.equal(result.memo, 'preserve this memo');
-  assert.equal(result.count, 3);
+  assert.equal(result.count, 4);
 }));
 
 test('an unrelated nonempty database is left intact and startup fails clearly', () => fixture(temp => {
@@ -112,5 +112,5 @@ test('relative SQLite URLs resolve consistently against the schema directory', (
   const result = runNode(start, env, temp);
   assert.equal(result.databaseFile, database);
   assert.equal(result.databaseUrl, `file:${database}`);
-  assert.equal(result.count, 3);
+  assert.equal(result.count, 4);
 }));

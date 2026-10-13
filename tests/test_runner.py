@@ -31,6 +31,7 @@ NARY = '''static int count(struct Node *p) { if(!p) return 0; int n=1; for(int i
 static void walk(struct Node *p,int *out,int *at) { if(!p)return; out[(*at)++]=p->val; for(int i=0;i<p->numChildren;i++) walk(p->children[i],out,at); }
 int* preorder(struct Node *root,int *size) { *size=count(root); int *out=malloc((size_t)(*size)*sizeof(int)); int at=0; walk(root,out,&at); return out; }'''
 
+INORDER = 'static void visit(struct TreeNode *p, int *out, int *at) {\n    if (!p) return;\n    visit(p->left, out, at); out[(*at)++] = p->val; visit(p->right, out, at);\n}\nint* inorderTraversal(struct TreeNode *root, int *size) {\n    int *out = malloc(100 * sizeof(int)); *size = 0;\n    visit(root, out, size); return out;\n}'
 
 class RunnerTests(unittest.TestCase):
     def setUp(self):
@@ -52,8 +53,8 @@ class RunnerTests(unittest.TestCase):
         self.assertIsNotNone(done, result.stdout + result.stderr)
         return result, done
 
-    def test_three_problem_encodings_and_solution_variants(self):
-        for problem, code in ((1480, ARRAY), (783, BST), (589, NARY)):
+    def test_four_problem_encodings_and_solution_variants(self):
+        for problem, code in ((1480, ARRAY), (783, BST), (589, NARY), (94, INORDER)):
             with self.subTest(problem=problem):
                 self.code(problem, code, 'reference')
                 result, report = self.run_problem(problem, 'reference')
