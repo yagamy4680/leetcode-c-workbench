@@ -1,0 +1,17 @@
+{
+  "id": 783,
+  "title": "Minimum Distance Between BST Nodes",
+  "slug": "minimum-distance-between-bst-nodes",
+  "difficulty": "Easy",
+  "topics": [
+    "Tree",
+    "Depth-First Search",
+    "Binary Search Tree"
+  ],
+  "url": "https://leetcode.com/problems/minimum-distance-between-bst-nodes/description/",
+  "sources": [
+    "main.c"
+  ],
+  "headers": [],
+  "signature": "int minDiffInBST(struct TreeNode* root);"
+}

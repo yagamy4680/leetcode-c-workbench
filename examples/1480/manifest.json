@@ -1,0 +1,16 @@
+{
+  "id": 1480,
+  "title": "Running Sum of 1d Array",
+  "slug": "running-sum-of-1d-array",
+  "difficulty": "Easy",
+  "topics": [
+    "Array",
+    "Prefix Sum"
+  ],
+  "url": "https://leetcode.com/problems/running-sum-of-1d-array/description/",
+  "sources": [
+    "main.c"
+  ],
+  "headers": [],
+  "signature": "int* runningSum(int* nums, int numsSize, int* returnSize);"
+}

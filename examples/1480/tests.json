@@ -1,0 +1,83 @@
+[
+  {
+    "id": "example1",
+    "input": {
+      "nums": [
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    "expected": [
+      1,
+      3,
+      6,
+      10
+    ]
+  },
+  {
+    "id": "example2",
+    "input": {
+      "nums": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "expected": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  {
+    "id": "example3",
+    "input": {
+      "nums": [
+        3,
+        1,
+        2,
+        10,
+        1
+      ]
+    },
+    "expected": [
+      3,
+      4,
+      6,
+      16,
+      17
+    ]
+  },
+  {
+    "id": "single",
+    "input": {
+      "nums": [
+        5
+      ]
+    },
+    "expected": [
+      5
+    ]
+  },
+  {
+    "id": "negative",
+    "input": {
+      "nums": [
+        -2,
+        3,
+        -4
+      ]
+    },
+    "expected": [
+      -2,
+      1,
+      -3
+    ]
+  }
+]

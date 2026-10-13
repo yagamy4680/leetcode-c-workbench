@@ -1,0 +1,5 @@
+# Add this site block to the Caddy configuration on the SAME Mac.
+# Node.js performs Basic Auth; preserve its WWW-Authenticate header.
+leetcode.myab.cc {
+    reverse_proxy 127.0.0.1:3089
+}

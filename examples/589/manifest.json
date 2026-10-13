@@ -1,0 +1,17 @@
+{
+  "id": 589,
+  "title": "N-ary Tree Preorder Traversal",
+  "slug": "n-ary-tree-preorder-traversal",
+  "difficulty": "Easy",
+  "topics": [
+    "Tree",
+    "Depth-First Search",
+    "Stack"
+  ],
+  "url": "https://leetcode.com/problems/n-ary-tree-preorder-traversal/description/",
+  "sources": [
+    "main.c"
+  ],
+  "headers": [],
+  "signature": "int* preorder(struct Node* root, int* returnSize);"
+}

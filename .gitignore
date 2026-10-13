@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.db
+*.db-*
+*.sqlite*
+__pycache__/
+*.pyc
+.DS_Store
+.impeccable/mocks/
+.impeccable/config.local.json
+workspace/
+data/
+coverage/
+web/utilities.css

@@ -1,0 +1,94 @@
+// DOM interaction regressions, not browser visual/layout tests.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { JSDOM } from 'jsdom';
+import { marked } from 'marked';
+import createDOMPurify from 'dompurify';
+
+const html=fs.readFileSync('web/index.html','utf8');
+const source=fs.readFileSync('web/app.js','utf8');
+const pause=()=>new Promise(resolve=>setTimeout(resolve,0));
+const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return{promise,resolve};};
+function problem(id=1480,extra={}) { return {id,title:`Problem ${id}`,difficulty:'Easy',url:`https://leetcode.com/problems/test-${id}/`,manifest:{topics:['Array']},description:'# Description',solutions:[{name:'master'}],runs:[],submissions:[],tests:[{id:'single',input:{nums:[1]},expected:[1]}],testsHash:'tests-hash',...extra}; }
+function response(value) { return new Response(typeof value==='string'?value:JSON.stringify(value),{status:200}); }
+async function harness(handler=()=>undefined) {
+  const dom=new JSDOM(html,{runScripts:'outside-only',url:'http://127.0.0.1:3089/'}),w=dom.window,calls=[];
+  w.marked=marked;w.DOMPurify=createDOMPurify(w);w.confirm=()=>true;
+  w.TextDecoder=TextDecoder;
+  w.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
+  w.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
+  w.fetch=async(route,opts={})=>{
+    const call={route,method:opts.method||'GET',body:opts.body?JSON.parse(opts.body):null};calls.push(call);
+    const custom=handler(call);if(custom!==undefined)return await custom;
+    if(route==='/api/problems')return response([problem()]);
+    const match=/^\/api\/problems\/(\d+)$/.exec(route);if(match)return response(problem(Number(match[1])));
+    if(route.endsWith('/solutions/master'))return response({code:'initial',hash:'source-hash'});
+    throw new Error(`Unexpected request ${call.method} ${route}`);
+  };
+  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog};');
+  await pause();await w.hooks.loadProblem(1480);
+  return {w,calls,$:id=>w.document.getElementById(id),close:()=>w.close()};
+}
+
+test('saving code acknowledges the submitted text, preserving newer typing',async()=>{
+  const ack=deferred();const h=await harness(call=>call.method==='PUT'&&call.route.includes('/solutions/')?ack.promise:undefined);
+  h.$('code').value='submitted';const saving=h.w.hooks.saveCode();
+  h.$('code').value='newer edit';ack.resolve(response({hash:'submitted-hash'}));await saving;
+  assert.equal(h.w.hooks.state.savedCode,'submitted');assert.equal(h.w.hooks.dirty(),true);
+  assert.equal(h.$('code').value,'newer edit');assert.equal(h.$('saved-state').textContent,'Unsaved changes');h.close();
+});
+test('saving tests acknowledges the submitted JSON, preserving newer edits',async()=>{
+  const ack=deferred();const h=await harness(call=>call.method==='PUT'&&call.route.endsWith('/tests')?ack.promise:undefined);
+  const sent='[{"id":"sent","input":{},"expected":1}]';h.$('tests-json').value=sent;
+  const saving=h.w.hooks.saveTests();h.$('tests-json').value='[{"id":"newer","input":{},"expected":2}]';
+  ack.resolve(response({hash:'saved-tests'}));await saving;
+  assert.equal(h.w.hooks.state.savedTests,sent);assert.equal(h.w.hooks.testsDirty(),true);h.close();
+});
+test('rapid run calls cannot overlap while the first save is pending',async()=>{
+  const ack=deferred();const h=await harness(call=>{
+    if(call.method==='PUT')return ack.promise;
+    if(call.route.endsWith('/run'))return response(JSON.stringify({type:'done',run:{id:'run1',problemId:1480,solution:'master',sourceHash:'saved-hash',testsHash:'tests-hash',status:'passed',passed:1,total:1,durationMs:5,cases:[],leakCheck:'unavailable'}})+'\n');
+  });
+  h.$('code').value='submitted';const first=h.w.hooks.runTests();await h.w.hooks.runTests();
+  ack.resolve(response({hash:'saved-hash'}));await first;
+  assert.equal(h.calls.filter(c=>c.route.endsWith('/run')).length,1);assert.equal(h.w.hooks.state.running,false);h.close();
+});
+test('unsaved testcase edits block a run with recovery text',async()=>{
+  const h=await harness();h.$('tests-json').value='[]';await h.w.hooks.runTests();
+  assert.equal(h.calls.filter(c=>c.route.endsWith('/run')).length,0);assert.match(h.$('notice').textContent,/Save your test case/);h.close();
+});
+test('keyboard users can leave the editor with Shift Tab or Escape',async()=>{
+  const h=await harness();h.$('code').focus();
+  const tab=new h.w.KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true});h.$('code').dispatchEvent(tab);
+  assert.equal(tab.defaultPrevented,false);
+  h.$('code').dispatchEvent(new h.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
+  assert.equal(h.w.document.activeElement,h.$('save-code'));h.close();
+});
+test('case names live and compile retain their own log channels',async()=>{
+  const h=await harness(call=>call.route.includes('/logs?')?response('case log'):undefined);
+  h.w.hooks.showReport({id:'run1',problemId:1480,solution:'master',sourceHash:'source-hash',testsHash:'tests-hash',status:'failed',passed:0,total:1,durationMs:1,cases:[{id:'compile',status:'wrong_answer',durationMs:1}],leakCheck:'unavailable'});
+  h.$('log-source').value='case:compile';await h.w.hooks.showLog();
+  assert.ok(h.calls.some(c=>c.route.includes('case=compile')));assert.equal(h.$('log').textContent,'case log');h.close();
+});
+test('missing solution error releases the navigation lock',async()=>{
+  const h=await harness(call=>call.route==='/api/problems/999'?response(problem(999,{solutions:[]})):undefined);
+  await assert.rejects(h.w.hooks.loadProblem(999),/No solution/);
+  assert.equal(h.w.hooks.state.loading,false);await h.w.hooks.loadProblem(1480);assert.equal(h.w.hooks.state.problem.id,1480);h.close();
+});
+test('a slow history response cannot overwrite the newly selected problem',async()=>{
+  const ack=deferred();const h=await harness(call=>call.route==='/api/runs/old-run'?ack.promise:undefined);
+  const button=h.w.document.createElement('button');button.dataset.run='old-run';h.w.document.body.append(button);button.click();
+  await h.w.hooks.loadProblem(589);
+  ack.resolve(response({id:'old-run',problemId:1480,solution:'master',cases:[]}));await pause();await pause();
+  assert.equal(h.w.hooks.state.problem.id,589);assert.equal(h.w.hooks.state.report,null);h.close();
+});
+test('failed source loading preserves the previous problem and editor together',async()=>{
+  const h=await harness(call=>call.route==='/api/problems/589/solutions/master'?new Response(JSON.stringify({error:'Source unavailable'}),{status:404}):undefined);
+  await assert.rejects(h.w.hooks.loadProblem(589),/Source unavailable/);
+  assert.equal(h.w.hooks.state.problem.id,1480);assert.equal(h.$('code').value,'initial');assert.equal(h.w.hooks.state.loading,false);h.close();
+});
+test('import navigation is blocked during an active run',async()=>{
+  const h=await harness();h.w.hooks.state.running=true;h.$('import-btn').click();await pause();
+  assert.equal(h.$('import-dialog').hasAttribute('open'),false);h.close();
+});

@@ -1,0 +1,35 @@
+{
+  "name": "leetcode-c-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "start": "node server/index.mjs",
+    "dev": "node --watch server/index.mjs",
+    "build:css": "tailwindcss -i web/tailwind.css -o web/utilities.css --minify",
+    "test": "python3 -m unittest discover -s tests -v && node --test tests/*.test.mjs",
+    "postinstall": "prisma generate && npm run build:css"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "bootstrap": "5.3.8",
+    "dompurify": "3.4.17",
+    "dotenv": "17.2.3",
+    "express": "5.1.0",
+    "marked": "17.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.3",
+    "jsdom": "27.4.0",
+    "prisma": "6.19.3",
+    "tailwindcss": "4.3.3"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2",
+    "@parcel/watcher": "2.6.0"
+  }
+}

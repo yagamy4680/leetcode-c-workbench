@@ -1,0 +1,543 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-13T17:31:18.828578Z",
+  "title": "Design System: LeetCode C Workbench",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Accent",
+        "tonalRamp": [
+          "oklch(15% 0.1414 257.54)",
+          "oklch(26% 0.1414 257.54)",
+          "oklch(38% 0.1414 257.54)",
+          "oklch(49% 0.1414 257.54)",
+          "oklch(61% 0.1414 257.54)",
+          "oklch(72% 0.1414 257.54)",
+          "oklch(84% 0.1414 257.54)",
+          "oklch(95% 0.1414 257.54)"
+        ]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Accent Hover",
+        "tonalRamp": [
+          "oklch(15% 0.1114 255.63)",
+          "oklch(26% 0.1114 255.63)",
+          "oklch(38% 0.1114 255.63)",
+          "oklch(49% 0.1114 255.63)",
+          "oklch(61% 0.1114 255.63)",
+          "oklch(72% 0.1114 255.63)",
+          "oklch(84% 0.1114 255.63)",
+          "oklch(95% 0.1114 255.63)"
+        ]
+      },
+      "focus": {
+        "role": "primary",
+        "displayName": "Focus",
+        "tonalRamp": [
+          "oklch(15% 0.1537 257.84)",
+          "oklch(26% 0.1537 257.84)",
+          "oklch(38% 0.1537 257.84)",
+          "oklch(49% 0.1537 257.84)",
+          "oklch(61% 0.1537 257.84)",
+          "oklch(72% 0.1537 257.84)",
+          "oklch(84% 0.1537 257.84)",
+          "oklch(95% 0.1537 257.84)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0290 244.88)",
+          "oklch(26% 0.0290 244.88)",
+          "oklch(38% 0.0290 244.88)",
+          "oklch(49% 0.0290 244.88)",
+          "oklch(61% 0.0290 244.88)",
+          "oklch(72% 0.0290 244.88)",
+          "oklch(84% 0.0290 244.88)",
+          "oklch(95% 0.0290 244.88)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "tonalRamp": [
+          "oklch(15% 0.0306 243.22)",
+          "oklch(26% 0.0306 243.22)",
+          "oklch(38% 0.0306 243.22)",
+          "oklch(49% 0.0306 243.22)",
+          "oklch(61% 0.0306 243.22)",
+          "oklch(72% 0.0306 243.22)",
+          "oklch(84% 0.0306 243.22)",
+          "oklch(95% 0.0306 243.22)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(26% 0.0000 0.00)",
+          "oklch(38% 0.0000 0.00)",
+          "oklch(49% 0.0000 0.00)",
+          "oklch(61% 0.0000 0.00)",
+          "oklch(72% 0.0000 0.00)",
+          "oklch(84% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0034 247.86)",
+          "oklch(26% 0.0034 247.86)",
+          "oklch(38% 0.0034 247.86)",
+          "oklch(49% 0.0034 247.86)",
+          "oklch(61% 0.0034 247.86)",
+          "oklch(72% 0.0034 247.86)",
+          "oklch(84% 0.0034 247.86)",
+          "oklch(95% 0.0034 247.86)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Line",
+        "tonalRamp": [
+          "oklch(15% 0.0120 239.92)",
+          "oklch(26% 0.0120 239.92)",
+          "oklch(38% 0.0120 239.92)",
+          "oklch(49% 0.0120 239.92)",
+          "oklch(61% 0.0120 239.92)",
+          "oklch(72% 0.0120 239.92)",
+          "oklch(84% 0.0120 239.92)",
+          "oklch(95% 0.0120 239.92)"
+        ]
+      },
+      "problem-hover": {
+        "role": "neutral",
+        "displayName": "Problem Hover",
+        "tonalRamp": [
+          "oklch(15% 0.0086 247.92)",
+          "oklch(26% 0.0086 247.92)",
+          "oklch(38% 0.0086 247.92)",
+          "oklch(49% 0.0086 247.92)",
+          "oklch(61% 0.0086 247.92)",
+          "oklch(72% 0.0086 247.92)",
+          "oklch(84% 0.0086 247.92)",
+          "oklch(95% 0.0086 247.92)"
+        ]
+      },
+      "problem-current": {
+        "role": "neutral",
+        "displayName": "Problem Current",
+        "tonalRamp": [
+          "oklch(15% 0.0270 255.09)",
+          "oklch(26% 0.0270 255.09)",
+          "oklch(38% 0.0270 255.09)",
+          "oklch(49% 0.0270 255.09)",
+          "oklch(61% 0.0270 255.09)",
+          "oklch(72% 0.0270 255.09)",
+          "oklch(84% 0.0270 255.09)",
+          "oklch(95% 0.0270 255.09)"
+        ]
+      },
+      "editor-paper": {
+        "role": "neutral",
+        "displayName": "Editor Paper",
+        "tonalRamp": [
+          "oklch(15% 0.0029 264.54)",
+          "oklch(26% 0.0029 264.54)",
+          "oklch(38% 0.0029 264.54)",
+          "oklch(49% 0.0029 264.54)",
+          "oklch(61% 0.0029 264.54)",
+          "oklch(72% 0.0029 264.54)",
+          "oklch(84% 0.0029 264.54)",
+          "oklch(95% 0.0029 264.54)"
+        ]
+      },
+      "editor-gutter": {
+        "role": "neutral",
+        "displayName": "Editor Gutter",
+        "tonalRamp": [
+          "oklch(15% 0.0059 239.82)",
+          "oklch(26% 0.0059 239.82)",
+          "oklch(38% 0.0059 239.82)",
+          "oklch(49% 0.0059 239.82)",
+          "oklch(61% 0.0059 239.82)",
+          "oklch(72% 0.0059 239.82)",
+          "oklch(84% 0.0059 239.82)",
+          "oklch(95% 0.0059 239.82)"
+        ]
+      },
+      "editor-border": {
+        "role": "neutral",
+        "displayName": "Editor Border",
+        "tonalRamp": [
+          "oklch(15% 0.0239 246.09)",
+          "oklch(26% 0.0239 246.09)",
+          "oklch(38% 0.0239 246.09)",
+          "oklch(49% 0.0239 246.09)",
+          "oklch(61% 0.0239 246.09)",
+          "oklch(72% 0.0239 246.09)",
+          "oklch(84% 0.0239 246.09)",
+          "oklch(95% 0.0239 246.09)"
+        ]
+      },
+      "editor-ink": {
+        "role": "neutral",
+        "displayName": "Editor Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0503 249.58)",
+          "oklch(26% 0.0503 249.58)",
+          "oklch(38% 0.0503 249.58)",
+          "oklch(49% 0.0503 249.58)",
+          "oklch(61% 0.0503 249.58)",
+          "oklch(72% 0.0503 249.58)",
+          "oklch(84% 0.0503 249.58)",
+          "oklch(95% 0.0503 249.58)"
+        ]
+      },
+      "log-paper": {
+        "role": "neutral",
+        "displayName": "Log Paper",
+        "tonalRamp": [
+          "oklch(15% 0.0304 249.05)",
+          "oklch(26% 0.0304 249.05)",
+          "oklch(38% 0.0304 249.05)",
+          "oklch(49% 0.0304 249.05)",
+          "oklch(61% 0.0304 249.05)",
+          "oklch(72% 0.0304 249.05)",
+          "oklch(84% 0.0304 249.05)",
+          "oklch(95% 0.0304 249.05)"
+        ]
+      },
+      "log-ink": {
+        "role": "neutral",
+        "displayName": "Log Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0156 247.99)",
+          "oklch(26% 0.0156 247.99)",
+          "oklch(38% 0.0156 247.99)",
+          "oklch(49% 0.0156 247.99)",
+          "oklch(61% 0.0156 247.99)",
+          "oklch(72% 0.0156 247.99)",
+          "oklch(84% 0.0156 247.99)",
+          "oklch(95% 0.0156 247.99)"
+        ]
+      },
+      "passed": {
+        "role": "neutral",
+        "displayName": "Passed",
+        "tonalRamp": [
+          "oklch(15% 0.0888 161.28)",
+          "oklch(26% 0.0888 161.28)",
+          "oklch(38% 0.0888 161.28)",
+          "oklch(49% 0.0888 161.28)",
+          "oklch(61% 0.0888 161.28)",
+          "oklch(72% 0.0888 161.28)",
+          "oklch(84% 0.0888 161.28)",
+          "oklch(95% 0.0888 161.28)"
+        ]
+      },
+      "error": {
+        "role": "neutral",
+        "displayName": "Error",
+        "tonalRamp": [
+          "oklch(15% 0.1569 23.05)",
+          "oklch(26% 0.1569 23.05)",
+          "oklch(38% 0.1569 23.05)",
+          "oklch(49% 0.1569 23.05)",
+          "oklch(61% 0.1569 23.05)",
+          "oklch(72% 0.1569 23.05)",
+          "oklch(84% 0.1569 23.05)",
+          "oklch(95% 0.1569 23.05)"
+        ]
+      },
+      "pending": {
+        "role": "neutral",
+        "displayName": "Pending",
+        "tonalRamp": [
+          "oklch(15% 0.0875 73.07)",
+          "oklch(26% 0.0875 73.07)",
+          "oklch(38% 0.0875 73.07)",
+          "oklch(49% 0.0875 73.07)",
+          "oklch(61% 0.0875 73.07)",
+          "oklch(72% 0.0875 73.07)",
+          "oklch(84% 0.0875 73.07)",
+          "oklch(95% 0.0875 73.07)"
+        ]
+      },
+      "notice-paper": {
+        "role": "neutral",
+        "displayName": "Notice Paper",
+        "tonalRamp": [
+          "oklch(15% 0.0189 248.03)",
+          "oklch(26% 0.0189 248.03)",
+          "oklch(38% 0.0189 248.03)",
+          "oklch(49% 0.0189 248.03)",
+          "oklch(61% 0.0189 248.03)",
+          "oklch(72% 0.0189 248.03)",
+          "oklch(84% 0.0189 248.03)",
+          "oklch(95% 0.0189 248.03)"
+        ]
+      },
+      "notice-ink": {
+        "role": "neutral",
+        "displayName": "Notice Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0716 248.93)",
+          "oklch(26% 0.0716 248.93)",
+          "oklch(38% 0.0716 248.93)",
+          "oklch(49% 0.0716 248.93)",
+          "oklch(61% 0.0716 248.93)",
+          "oklch(72% 0.0716 248.93)",
+          "oklch(84% 0.0716 248.93)",
+          "oklch(95% 0.0716 248.93)"
+        ]
+      },
+      "error-notice-paper": {
+        "role": "neutral",
+        "displayName": "Error Notice Paper",
+        "tonalRamp": [
+          "oklch(15% 0.0187 9.31)",
+          "oklch(26% 0.0187 9.31)",
+          "oklch(38% 0.0187 9.31)",
+          "oklch(49% 0.0187 9.31)",
+          "oklch(61% 0.0187 9.31)",
+          "oklch(72% 0.0187 9.31)",
+          "oklch(84% 0.0187 9.31)",
+          "oklch(95% 0.0187 9.31)"
+        ]
+      },
+      "error-notice-ink": {
+        "role": "neutral",
+        "displayName": "Error Notice Ink",
+        "tonalRamp": [
+          "oklch(15% 0.1267 20.37)",
+          "oklch(26% 0.1267 20.37)",
+          "oklch(38% 0.1267 20.37)",
+          "oklch(49% 0.1267 20.37)",
+          "oklch(61% 0.1267 20.37)",
+          "oklch(72% 0.1267 20.37)",
+          "oklch(84% 0.1267 20.37)",
+          "oklch(95% 0.1267 20.37)"
+        ]
+      },
+      "control-border": {
+        "role": "neutral",
+        "displayName": "Control Border",
+        "tonalRamp": [
+          "oklch(15% 0.0070 247.90)",
+          "oklch(26% 0.0070 247.90)",
+          "oklch(38% 0.0070 247.90)",
+          "oklch(49% 0.0070 247.90)",
+          "oklch(61% 0.0070 247.90)",
+          "oklch(72% 0.0070 247.90)",
+          "oklch(84% 0.0070 247.90)",
+          "oklch(95% 0.0070 247.90)"
+        ]
+      },
+      "secondary-control": {
+        "role": "neutral",
+        "displayName": "Secondary Control",
+        "tonalRamp": [
+          "oklch(15% 0.0165 244.89)",
+          "oklch(26% 0.0165 244.89)",
+          "oklch(38% 0.0165 244.89)",
+          "oklch(49% 0.0165 244.89)",
+          "oklch(61% 0.0165 244.89)",
+          "oklch(72% 0.0165 244.89)",
+          "oklch(84% 0.0165 244.89)",
+          "oklch(95% 0.0165 244.89)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Problem and dialog headings."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section headings; sidebar inherits the body line height."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "General text and compact controls."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Source and aligned line-number gutter."
+      },
+      "log": {
+        "displayName": "Log",
+        "purpose": "Compiler and runtime output."
+      }
+    },
+    "shadows": [
+      {
+        "name": "dialog",
+        "value": "0 16px 50px rgba(16, 30, 45, .25)",
+        "purpose": "Elevation for native import and submission dialogs."
+      },
+      {
+        "name": "field-focus",
+        "value": "0 0 0 .25rem rgba(13, 110, 253, .25)",
+        "purpose": "Inherited Bootstrap field and navigation focus treatment."
+      },
+      {
+        "name": "primary-button-focus",
+        "value": "0 0 0 .25rem rgba(49, 132, 253, .5)",
+        "purpose": "Inherited Bootstrap primary button focus treatment."
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-transition",
+        "value": "150ms ease-in-out",
+        "purpose": "Bootstrap state changes; removed for reduced motion."
+      },
+      {
+        "name": "dialog-in",
+        "value": "150ms cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "Dialog translates upward from 8px on opening; disabled for reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "stack-results",
+        "value": "1150px"
+      },
+      {
+        "name": "stack-navigation",
+        "value": "700px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "refersTo": "button-primary-compact",
+      "description": "Compact action to run native tests.",
+      "html": "<button type=\"button\" class=\"ds-primary\">Run tests</button>",
+      "css": ".ds-primary{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:.875rem;font-weight:400;line-height:1.5;padding:.25rem .5rem;border:1px solid;border-radius:.25rem;cursor:pointer;transition:color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;background:var(--accent,#225cac);color:#fff;border-color:var(--accent,#225cac)}.ds-primary:hover,.ds-primary:focus-visible{background:#194984;border-color:#194984}.ds-primary:focus-visible{outline:0;box-shadow:0 0 0 .25rem rgba(49,132,253,.5)}.ds-primary:active{background:#0a58ca;border-color:#0a53be}.ds-primary:disabled{pointer-events:none;opacity:.65;background:#0d6efd;border-color:#0d6efd}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}"
+    },
+    {
+      "name": "Outlined primary action",
+      "kind": "button",
+      "refersTo": "button-outline-primary",
+      "description": "Source saving and import access.",
+      "html": "<button type=\"button\" class=\"ds-outline-primary\">Save</button>",
+      "css": ".ds-outline-primary{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:.875rem;font-weight:400;line-height:1.5;padding:.25rem .5rem;border:1px solid;border-radius:.25rem;cursor:pointer;transition:color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;background:transparent;color:var(--accent,#225cac);border-color:var(--accent,#225cac)}.ds-outline-primary:hover,.ds-outline-primary:focus-visible{background:var(--accent,#225cac);color:#fff}.ds-outline-primary:focus-visible{outline:0;box-shadow:0 0 0 .25rem rgba(13,110,253,.5)}.ds-outline-primary:active{background:#0d6efd;border-color:#0d6efd;color:#fff}.ds-outline-primary:disabled{pointer-events:none;opacity:.65;background:transparent;color:#0d6efd;border-color:#0d6efd}@media(prefers-reduced-motion:reduce){.ds-outline-primary{transition:none}}"
+    },
+    {
+      "name": "Outlined secondary action",
+      "kind": "button",
+      "refersTo": "button-outline-secondary",
+      "description": "Utility action for tools, variants, and snapshots.",
+      "html": "<button type=\"button\" class=\"ds-outline-secondary\">New variant</button>",
+      "css": ".ds-outline-secondary{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:.875rem;font-weight:400;line-height:1.5;padding:.25rem .5rem;border:1px solid;border-radius:.25rem;cursor:pointer;transition:color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;background:transparent;color:#6c757d;border-color:#6c757d}.ds-outline-secondary:hover,.ds-outline-secondary:focus-visible,.ds-outline-secondary:active{background:#6c757d;color:#fff}.ds-outline-secondary:focus-visible{outline:0;box-shadow:0 0 0 .25rem rgba(108,117,125,.5)}.ds-outline-secondary:disabled{pointer-events:none;opacity:.65}@media(prefers-reduced-motion:reduce){.ds-outline-secondary{transition:none}}"
+    },
+    {
+      "name": "Link action",
+      "kind": "button",
+      "refersTo": "button-link",
+      "description": "Compact refresh, reload, log, and history action.",
+      "html": "<button type=\"button\" class=\"ds-link\">Reload</button>",
+      "css": ".ds-link{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:.875rem;font-weight:400;line-height:1.5;padding:.25rem .5rem;border:1px solid;border-radius:.25rem;cursor:pointer;transition:color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;color:#0d6efd;background:transparent;border-color:transparent;text-decoration:underline}.ds-link:hover,.ds-link:active{color:#0a58ca}.ds-link:focus-visible{outline:0;box-shadow:0 0 0 .25rem rgba(49,132,253,.5)}@media(prefers-reduced-motion:reduce){.ds-link{transition:none}}"
+    },
+    {
+      "name": "Search field",
+      "kind": "input",
+      "refersTo": "search-field",
+      "description": "Compact field for problem ID or title.",
+      "html": "<input type=\"search\" class=\"ds-search\" aria-label=\"Find a problem\" placeholder=\"Find by ID or title\">",
+      "css": ".ds-search{width:100%;font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:.875rem;line-height:1.5;color:var(--ink,#202e3a);background:#fff;padding:.25rem .5rem;border:1px solid #dee2e6;border-radius:.25rem;transition:border-color .15s ease-in-out,box-shadow .15s ease-in-out}.ds-search:focus{border-color:#86b7fe;outline:0;box-shadow:0 0 0 .25rem rgba(13,110,253,.25)}@media(prefers-reduced-motion:reduce){.ds-search{transition:none}}"
+    },
+    {
+      "name": "Section navigation",
+      "kind": "nav",
+      "refersTo": "section-navigation",
+      "description": "Problem section buttons with current panel state.",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"Problem sections\"><button type=\"button\" class=\"ds-tab ds-tab-current\" aria-current=\"page\">Solution</button><button type=\"button\" class=\"ds-tab\">Test cases</button><button type=\"button\" class=\"ds-tab\">History</button></nav>",
+      "css": ".ds-tabs{display:flex;flex-wrap:wrap;border-bottom:1px solid #dee2e6}.ds-tab{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:14px;line-height:1.5;color:var(--muted,#536472);background:transparent;padding:.5rem 1rem;border:1px solid transparent;border-radius:.375rem .375rem 0 0;margin-bottom:-1px;cursor:pointer;transition:color .15s ease-in-out,border-color .15s ease-in-out}.ds-tab:hover,.ds-tab:focus{color:#0a58ca;border-color:#e9ecef #e9ecef #dee2e6}.ds-tab:focus-visible{outline:0;box-shadow:0 0 0 .25rem rgba(13,110,253,.25)}.ds-tab-current{color:#000;font-weight:600;background:#fff;border-color:#dee2e6 #dee2e6 #fff}@media(prefers-reduced-motion:reduce){.ds-tab{transition:none}}"
+    },
+    {
+      "name": "Problem row",
+      "kind": "nav",
+      "refersTo": "problem-item",
+      "description": "Full-width selected problem with secondary metadata.",
+      "html": "<button type=\"button\" class=\"ds-problem\" aria-current=\"page\"><strong>589. N-ary Tree Preorder Traversal</strong><small>Easy \u00b7 2 solutions \u00b7 passed</small></button>",
+      "css": ".ds-problem{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:block;width:100%;background:transparent;color:var(--ink,#202e3a);border:0;border-radius:6px;padding:12px 10px;text-align:left;cursor:pointer}.ds-problem strong{display:block;font-size:14px;font-weight:600;line-height:1.5}.ds-problem small{display:block;margin-top:4px;color:var(--muted,#536472);font-size:12.25px;line-height:1.5}.ds-problem:hover{background:#e7ecf1}.ds-problem[aria-current=\"page\"]{background:#dae7f8}.ds-problem:focus-visible{outline:3px solid var(--focus,#1c5cb4);outline-offset:3px;}"
+    },
+    {
+      "name": "Source editor",
+      "kind": "custom",
+      "refersTo": "code-editor",
+      "description": "Shared frame keeps source and gutter aligned.",
+      "html": "<div class=\"ds-editor\"><pre class=\"ds-gutter\" aria-hidden=\"true\">1\n2\n3</pre><textarea class=\"ds-code\" aria-label=\"Solution source\" spellcheck=\"false\">int answer(void) {\n    return 42;\n}</textarea></div>",
+      "css": ".ds-editor{display:flex;border:1px solid #b9c7d4;border-radius:6px;overflow:hidden;background:#fafbfd;height:max(380px,calc(100vh - 370px))}.ds-gutter,.ds-code{font:13px/21px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:14px 10px;margin:0}.ds-gutter{text-align:right;background:#eef2f5;color:var(--muted,#536472);min-width:42px;overflow:hidden;user-select:none}.ds-code{flex:1;border:0;outline:none;resize:none;background:transparent;color:#20374e;width:100%;tab-size:4;white-space:pre;overflow:auto}.ds-editor:focus-within{outline:2px solid var(--focus,#1c5cb4);outline-offset:2px}"
+    },
+    {
+      "name": "Runtime log",
+      "kind": "custom",
+      "refersTo": "runtime-log",
+      "description": "Bounded panel for compiler and runtime output.",
+      "html": "<pre class=\"ds-log\" tabindex=\"0\" aria-label=\"Compiler and runtime log\">[passed] example1 \u00b7 8 ms\nprintf output appears here.</pre>",
+      "css": ".ds-log{font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;min-height:180px;max-height:340px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#192633;color:#e1eaf3;padding:14px;border-radius:6px;margin:0}.ds-log:focus-visible{outline:3px solid var(--focus,#1c5cb4);outline-offset:3px;}"
+    },
+    {
+      "name": "Dialog surface",
+      "kind": "custom",
+      "refersTo": "dialog",
+      "description": "Native dialog surface for import and fixed submission code.",
+      "html": "<section class=\"ds-dialog\" aria-label=\"Submission snapshot\"><h2 class=\"ds-dialog-title\">Submission snapshot</h2><p class=\"ds-dialog-meta\">master \u00b7 code fixed at snapshot time</p><button type=\"button\" class=\"ds-dialog-close\">Close</button></section>",
+      "css": ".ds-dialog{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:14px;line-height:1.5;background:#fff;color:var(--ink,#202e3a);border:0;border-radius:12px;padding:26px;max-width:760px;max-height:90vh;overflow:auto;box-shadow:0 16px 50px rgba(16,30,45,.25)}.ds-dialog-title{font-size:23px;font-weight:650;line-height:1.3;letter-spacing:-.02em;margin:0 0 12px}.ds-dialog-meta{color:var(--muted,#536472)}.ds-dialog-close{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:.875rem;font-weight:400;line-height:1.5;padding:.25rem .5rem;border:1px solid;border-radius:.25rem;cursor:pointer;transition:color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;color:#6c757d;border-color:#6c757d;background:transparent}.ds-dialog-close:hover{background:#6c757d;color:#fff}.ds-dialog-close:focus-visible{outline:0;box-shadow:0 0 0 .25rem rgba(108,117,125,.5)}@media(prefers-reduced-motion:reduce){.ds-dialog-close{transition:none}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "A familiar source editor",
+    "overview": "The user-approved Bootstrap utility interface uses an editor-and-results workspace with a compact problem navigator. Operate mode applies throughout: clear action labels, visible state, and readable diagnostics guide the interface. This document describes implemented HTML, CSS, and browser JavaScript; it does not claim browser or visual verification.\n\nThe desktop workspace places source and results side by side. Secondary tabs hold test data, the problem description, and history. White surfaces, thin dividers, restrained blue actions, and a dark log panel keep the working material easy to locate. Native dialogs contain import and submission snapshot tasks.",
+    "keyCharacteristics": [
+      "Compact Bootstrap controls and platform fonts.",
+      "Source editor and test results share the main workspace.",
+      "Explicit labels accompany run, save, and submission states.",
+      "Logs and long data stay in bounded, scrollable regions.",
+      "Responsive stacking preserves the same actions on smaller screens."
+    ],
+    "rules": [
+      {
+        "name": "The Written State Rule",
+        "body": "State is written in text as well as shown in color; keep result labels, save messages, and memory-check availability visible.",
+        "section": "colors"
+      },
+      {
+        "name": "The Aligned Source Rule",
+        "body": "Keep the source textarea and line-number gutter on the same font, padding, and line height.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Workspace Rule",
+        "body": "Keep the source, results, sidebar, and history flat; reserve elevated depth for dialogs.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preserve the compact Bootstrap control vocabulary and platform font stacks.",
+      "Do keep source, JSON, line numbers, and logs readable in monospace.",
+      "Do show written states and recovery instructions alongside color.",
+      "Do keep logs, long case details, and tables within scrollable working regions.",
+      "Do preserve the implemented responsive stacking and reduced-motion behavior."
+    ],
+    "donts": [
+      "Don't introduce decorative imagery into this utility workspace.",
+      "Don't replace explicit action labels with unlabeled icons.",
+      "Don't present snapshot code as an editable live solution.",
+      "Don't hide unsupported memory checks behind a passing status."
+    ]
+  }
+}
