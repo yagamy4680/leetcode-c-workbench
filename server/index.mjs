@@ -48,6 +48,7 @@ export async function createApp(db = createDatabaseClient()) {
     throw error;
   }
   const sourceEvents = createSourceEvents();
+  const active = new Set();
   const app = express();
   app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -81,9 +82,10 @@ export async function createApp(db = createDatabaseClient()) {
     res.json(await db.problem.findMany({ orderBy: { id: 'asc' }, include: { solutions: true, runs: { orderBy: { startedAt: 'desc' }, take: 1 } } }));
   });
   app.post('/api/problems', async (req, res) => {
-    const id = importBundle(req.body);
-    await syncProblem(db, id);
-    res.status(201).json({ id });
+    if (req.body?.overwrite === true && [...active].some(key => key.startsWith(`${req.body.manifest?.id}/`))) throw new HttpError(409, "Wait for this problem's active web run to finish before overwriting.");
+    const result = importBundle(req.body);
+    await syncProblem(db, result.id);
+    res.status(result.overwritten ? 200 : 201).json(result);
   });
   app.get('/api/problems/:id', async (req, res) => {
     await syncProblem(db, req.params.id);
@@ -117,7 +119,6 @@ export async function createApp(db = createDatabaseClient()) {
     const newHash = saveChecked(ownedFile(problemDir(req.params.id), 'tests.json'), content, req.body.expectedHash);
     res.json({ hash: newHash });
   });
-  const active = new Set();
   app.post('/api/problems/:id/run', (req, res) => {
     const variant = name(req.body.solution || 'master');
     const file = solutionFile(req.params.id, variant);
@@ -193,7 +194,7 @@ export async function createApp(db = createDatabaseClient()) {
     if (res.headersSent) return next(error);
     const status = error.status || (error.code === 'ENOENT' ? 404 : 500);
     if (status === 500) console.error(error);
-    res.status(status).json({ error: status === 500 ? 'Server error. See the service log.' : error.message });
+    res.status(status).json({ error: status === 500 ? 'Server error. See the service log.' : error.message, ...error.details });
   });
   const interval = setInterval(() => sync().catch(error => console.error('Indexing:', error.message)), 2000);
   interval.unref();

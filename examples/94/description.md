@@ -8,10 +8,25 @@ node's value, then traverse the right subtree.
 
 ## Examples
 
-- `[1,null,2,3]` produces `[1,3,2]`.
-- `[1,2,3,4,5,null,8,null,null,6,7,9]` produces `[4,2,6,5,7,1,3,9,8]`.
-- `[]` produces `[]`.
-- `[1]` produces `[1]`.
+### Example 1
+
+`root = [1,null,2,3]` produces `[1,3,2]`.
+
+![Example 1: a binary tree with root 1, right child 2, and node 3 as the left child of 2.](https://assets.leetcode.com/uploads/2024/08/29/screenshot-2024-08-29-202743.png)
+
+### Example 2
+
+`root = [1,2,3,4,5,null,8,null,null,6,7,9]` produces `[4,2,6,5,7,1,3,9,8]`.
+
+![Example 2: the larger binary tree used to illustrate inorder traversal.](https://assets.leetcode.com/uploads/2024/08/29/tree_2.png)
+
+### Example 3
+
+`root = []` produces `[]`.
+
+### Example 4
+
+`root = [1]` produces `[1]`.
 
 The tree contains at most 100 nodes, including the possibility of no nodes.
 Values range from -100 through 100. The follow-up asks for an iterative approach.

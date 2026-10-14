@@ -169,3 +169,36 @@ test('typing during an external refresh and navigation both reject stale source 
   await h.w.hooks.loadProblem(589);pending.resolve(response({code:'old problem',hash:'stale'}));await refresh;
   assert.equal(h.w.hooks.state.problem.id,589);assert.equal(h.$('code').value,'initial');h.close();
 });
+
+test('duplicate import prompts before replacing and uses the server confirmation hash',async()=>{
+  let posts=0;const h=await harness(call=>{
+    if(call.method==='POST'&&call.route==='/api/problems'){
+      posts++;
+      if(posts===1)return new Response(JSON.stringify({error:'Already exists',code:'problem_exists',id:1480,expectedHash:'confirmed'}),{status:409});
+      assert.equal(call.body.overwrite,true);assert.equal(call.body.expectedHash,'confirmed');
+      return response({id:1480,overwritten:true,backupPath:'import-backups/1480-backup'});
+    }
+  });
+  const prompts=[];h.w.confirm=text=>{prompts.push(text);return true;};
+  h.$('bundle').value=JSON.stringify({manifest:{id:1480},overwrite:true,expectedHash:'untrusted'});
+  h.$('import-dialog').showModal();h.$('import-submit').click();await pause();await pause();
+  assert.equal(posts,2);assert.match(prompts[0],/ALL solution variants/);
+  assert.match(h.$('notice').textContent,/import-backups/);assert.equal(h.$('import-dialog').open,false);h.close();
+});
+test('cancelling duplicate import keeps the dialog, bundle and existing editor',async()=>{
+  const h=await harness(call=>call.method==='POST'&&call.route==='/api/problems'?new Response(JSON.stringify({error:'Already exists',code:'problem_exists',id:1480,expectedHash:'confirmed'}),{status:409}):undefined);
+  h.w.confirm=()=>false;h.$('bundle').value='{"manifest":{"id":1480}}';
+  h.$('import-dialog').showModal();h.$('import-submit').click();await pause();await pause();
+  assert.equal(h.calls.filter(c=>c.method==='POST').length,1);assert.equal(h.$('code').value,'initial');
+  assert.equal(h.$('import-dialog').open,true);assert.match(h.$('import-error').textContent,/cancelled/);
+  assert.equal(h.$('import-submit').disabled,false);h.close();
+});
+test('problem images render from official asset URLs with alt text and unsafe HTML removed',async()=>{
+  const description=fs.readFileSync('examples/94/description.md','utf8')+'\n<script>bad()</script>';
+  const h=await harness(call=>call.route==='/api/problems/94'?response(problem(94,{description})):undefined);
+  await h.w.hooks.loadProblem(94);
+  const images=h.$('description-tab').querySelectorAll('img');assert.equal(images.length,2);
+  assert.equal(images[0].src,'https://assets.leetcode.com/uploads/2024/08/29/screenshot-2024-08-29-202743.png');
+  assert.equal(images[1].src,'https://assets.leetcode.com/uploads/2024/08/29/tree_2.png');
+  assert.ok(images[0].alt);assert.equal(h.$('description-tab').querySelector('script'),null);h.close();
+});

@@ -7,7 +7,7 @@ All endpoints require HTTP Basic Auth, including static files. Use HTTPS at `lee
 | GET | `/api/health` | Authenticated health check |
 | GET | `/api/doctor` | Compiler and sanitizer probe; `?refresh=1` repeats it |
 | GET | `/api/problems` | Indexed problems, solutions, latest run |
-| POST | `/api/problems` | Atomic new problem import; existing ID returns 409 |
+| POST | `/api/problems` | New problem import or explicitly confirmed replacement |
 | GET | `/api/problems/:id` | Metadata, markdown, tests/hash, recent history |
 | GET | `/api/problems/:id/solutions/:name` | Code and hash |
 | GET | `/api/problems/:id/solutions/:name/events` | SSE current hash and disk-change notifications |
@@ -53,7 +53,7 @@ ChatGPT should obtain the actual C snippet/signature, create the driver and help
 }
 ```
 
-On import, `solution-master.c` receives the default debug preamble unless its `WB_DEBUG_PREAMBLE` marker is already present. This becomes part of the solution and submission source. Existing problem IDs are never overwritten. Local helper files can make a bundle self-contained; updating shared runtime helpers requires updating the application first.
+On import, `solution-master.c` receives the default debug preamble unless its `WB_DEBUG_PREAMBLE` marker is already present. This becomes part of the solution and submission source. Existing problem IDs require explicit overwrite confirmation. Local helper files can make a bundle self-contained; updating shared runtime helpers requires updating the application first.
 
 The above file contents are explanatory placeholders, not compilable C. Create a runnable bundle from a shipped example:
 
@@ -62,6 +62,35 @@ python3 scripts/export-bundle.py examples/1480 > /tmp/problem-1480.json
 ```
 
 Additional framework `.c` files belong in manifest.sources; additional local `.h` files belong in manifest.headers. Shared runtime helpers are versioned in the application GitHub repo. A helper update and app pull must precede an import which requires that helper.
+
+## Replacing an existing problem
+
+The initial POST returns 409 with `code: "problem_exists"`, the existing problem `id`, and an `expectedHash` covering its directory contents. After user confirmation, repeat the complete bundle with two request-only fields:
+
+```json
+{
+  "overwrite": true,
+  "expectedHash": "hash-from-the-conflict-response",
+  "manifest": {},
+  "description": "...",
+  "files": {},
+  "tests": []
+}
+```
+
+These are schematic placeholders, not a valid bundle. Missing confirmation hash returns 428. Changed or removed problem contents return 409 with `code: "problem_changed"`; obtain a fresh conflict and confirm again. Active web runs block replacement; finish CLI runs first. The browser ignores confirmation fields in uploaded JSON and always asks the user when the server reports a duplicate.
+
+Validation and staging finish before replacement. The previous directory is renamed into `$WB_DATA_DIR/import-backups/`, then the staged directory is installed. A failed installation restores the previous directory. Success returns 200 with `{id, overwritten: true, backupPath}`; fresh imports return 201 with `{id, overwritten: false}`. `backupPath` is relative to the workspace. Replacement installs exactly the bundle's files, removing old variants from the active problem and SQLite solution index. Original variants remain in the backup. Run records, captured sources, and submission snapshots are retained. Backups have no automatic expiration.
+
+## Description images
+
+When preparing bundles, retain important diagrams and example illustrations as Markdown images with their original official HTTPS asset URLs and descriptive alt text. Put each image next to its corresponding example. For example:
+
+```markdown
+![Example 1 binary tree](https://assets.leetcode.com/uploads/2024/08/29/screenshot-2024-08-29-202743.png)
+```
+
+The description renderer already supports Markdown images and sanitizes HTML. CSP permits HTTPS images, and images fit the description panel width. These are external references; viewing them requires access to the asset host. Do not invent asset URLs or embed authentication credentials.
 
 For authenticated curl, prefer a private netrc file instead of putting the password into shell history. For example, with credentials already configured in `~/.netrc-workbench` (mode 600):
 

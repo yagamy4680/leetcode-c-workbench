@@ -55,7 +55,7 @@ test('browser origin checks block cross-site mutations',async()=>{
   assert.equal((await request('/api/problems/1480/solutions','POST',{name:'blocked'},{Origin:'https://other.example'})).status,403);
   assert.equal((await request('/api/problems/1480/solutions','POST',{name:'blocked'},{'Sec-Fetch-Site':'cross-site'})).status,403);
 });
-test('problem import is atomic and never overwrites an existing problem',async()=>{
+test('problem import is atomic and rejects unconfirmed duplicate IDs',async()=>{
   const dir=path.join(root,'examples/1480');
   const manifest=JSON.parse(fs.readFileSync(path.join(dir,'manifest.json'),'utf8'));manifest.id=999;
   const files=Object.fromEntries(['main.c','solution.h','solution-master.c'].map(name=>[name,fs.readFileSync(path.join(dir,name),'utf8')]));
@@ -132,4 +132,46 @@ test('source events survive atomic replacement, repeated saves, deletion and rec
     fs.unlinkSync(file);assert.equal((await next()).hash,null);
     fs.writeFileSync(file,'/* restored */');assert.ok((await next()).hash);
   } finally {controller.abort();await reader.cancel().catch(()=>{});}
+});
+
+test('confirmed overwrite backs up all variants, checks disk changes and preserves history',async()=>{
+  const bundle=JSON.parse(fs.readFileSync('bundles/problem-94.json','utf8'));
+  bundle.manifest.id=999;
+  await request('/api/problems/999/solutions','POST',{name:'personal'});
+  const oldFile=path.join(data,'problems/999/solution-personal.c');
+  fs.writeFileSync(oldFile,'/* personal solution */');
+  const runId='b'.repeat(32), submissionId='c'.repeat(32);
+  await db.run.create({data:{id:runId,problemId:999,solution:'personal',sourceHash:'old',buildHash:'old',contextHash:'old',status:'passed',passed:1,total:1,durationMs:1,startedAt:new Date()}});
+  await db.submission.create({data:{id:submissionId,problemId:999,solution:'personal',sourceHash:'old',commitSha:'fixture',runId}});
+  const duplicate=await request('/api/problems','POST',bundle);
+  assert.equal(duplicate.status,409);const conflict=await duplicate.json();
+  assert.equal(conflict.code,'problem_exists');assert.ok(conflict.expectedHash);
+  assert.equal((await request('/api/problems','POST',{...bundle,overwrite:true})).status,428);
+  fs.writeFileSync(oldFile,'/* modified after confirmation */');
+  assert.equal((await request('/api/problems','POST',{...bundle,overwrite:true,expectedHash:conflict.expectedHash})).status,409);
+  const latest=await(await request('/api/problems','POST',bundle)).json();
+  assert.equal((await request('/api/problems','POST',{...bundle,overwrite:true,expectedHash:latest.expectedHash,files:{...bundle.files,'bad.txt':'invalid'}})).status,400);
+  assert.equal(fs.readFileSync(oldFile,'utf8'),'/* modified after confirmation */');
+  const result=await request('/api/problems','POST',{...bundle,overwrite:true,expectedHash:latest.expectedHash});
+  assert.equal(result.status,200);const imported=await result.json();assert.equal(imported.overwritten,true);
+  assert.equal(fs.readFileSync(path.join(data,imported.backupPath,'solution-personal.c'),'utf8'),'/* modified after confirmation */');
+  assert.equal(fs.existsSync(oldFile),false);
+  assert.equal(await db.solution.count({where:{problemId:999,name:'personal'}}),0);
+  assert.equal(await db.run.count({where:{id:runId}}),1);assert.equal(await db.submission.count({where:{id:submissionId}}),1);
+  const description=fs.readFileSync(path.join(data,'problems/999/description.md'),'utf8');
+  assert.match(description,/!\[.*\]\(https:\/\/assets.leetcode.com\/uploads\/2024\/08\/29\/tree_2.png\)/);
+});
+
+test('failed replacement installation restores the original problem directory',async()=>{
+  const {importBundle}=await import('../server/workspace.mjs');
+  const bundle=JSON.parse(fs.readFileSync('bundles/problem-94.json','utf8'));bundle.manifest.id=997;
+  importBundle(bundle);const file=path.join(data,'problems/997/solution-master.c');
+  fs.writeFileSync(file,'/* preserve after failed installation */');
+  let expectedHash;try {importBundle(bundle);} catch(error){expectedHash=error.details.expectedHash;}
+  const rename=fs.renameSync;
+  try {
+    fs.renameSync=(from,to)=>{if(path.basename(from).startsWith('.import-')&&to===path.dirname(file))throw new Error('Simulated installation failure');return rename(from,to);};
+    assert.throws(()=>importBundle({...bundle,overwrite:true,expectedHash}),/Simulated installation failure/);
+  } finally {fs.renameSync=rename;}
+  assert.equal(fs.readFileSync(file,'utf8'),'/* preserve after failed installation */');
 });

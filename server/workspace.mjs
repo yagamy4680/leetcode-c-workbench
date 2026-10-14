@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { appDir, dataDir } from './config.mjs';
 
 export class HttpError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, message, details = {}) { super(message); this.status = status; this.details = details; }
 }
 export const hash = content => crypto.createHash('sha256').update(content).digest('hex');
 export const readJSON = file => JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -50,11 +50,26 @@ export function validateTests(tests) {
   }
   return tests;
 }
+export function problemFingerprint(dir) {
+  const entries = [];
+  function visit(root, prefix = '') {
+    for (const filename of fs.readdirSync(root).sort()) {
+      const file = path.join(root, filename), relative = prefix + filename;
+      const stat = fs.lstatSync(file);
+      if (stat.isSymbolicLink()) throw new HttpError(400, 'Workspace symlinks are not supported.');
+      if (stat.isDirectory()) { entries.push([relative, 'directory']); visit(file, relative + '/'); }
+      else if (stat.isFile()) entries.push([relative, hash(fs.readFileSync(file))]);
+      else throw new HttpError(400, 'Unsupported workspace file.');
+    }
+  }
+  visit(dir);
+  return hash(JSON.stringify(entries));
+}
 export function importBundle(bundle) {
+  if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) throw new HttpError(400, 'Provide a problem bundle.');
   const { manifest: meta, description, files, tests } = bundle;
   if (!meta || !Number.isInteger(meta.id) || typeof meta.title !== 'string' || !meta.title.trim() || typeof meta.slug !== 'string' || !Array.isArray(meta.topics) || meta.topics.some(t => typeof t !== 'string') || !['Easy', 'Medium', 'Hard'].includes(meta.difficulty) || typeof meta.url !== 'string') throw new HttpError(400, 'Invalid manifest metadata.');
   const dir = problemDir(meta.id);
-  if (fs.existsSync(dir)) throw new HttpError(409, 'Problem already exists. Import never overwrites local solutions.');
   if (typeof description !== 'string' || !files || typeof files !== 'object' || Array.isArray(files)) throw new HttpError(400, 'description and files are required.');
   validateTests(tests);
   for (const required of ['main.c', 'solution.h', 'solution-master.c']) if (typeof files[required] !== 'string') throw new HttpError(400, `Missing ${required}.`);
@@ -63,9 +78,16 @@ export function importBundle(bundle) {
   const headers = meta.headers || [];
   if (!Array.isArray(sources) || !sources.includes('main.c') || sources.some(s => typeof s !== 'string' || !/^[A-Za-z0-9_-]+\.c$/.test(s) || s.startsWith('solution-') || !Object.hasOwn(files, s))) throw new HttpError(400, 'Invalid framework sources.');
   if (!Array.isArray(headers) || headers.some(h => typeof h !== 'string' || !/^[A-Za-z0-9_-]+\.h$/.test(h) || !Object.hasOwn(files, h))) throw new HttpError(400, 'Invalid framework headers.');
+  const exists = fs.existsSync(dir);
+  const expectedHash = exists ? problemFingerprint(dir) : null;
+  if (exists && bundle.overwrite !== true) throw new HttpError(409, 'Problem already exists. Confirm before replacing its files and solutions.', { code: 'problem_exists', id: meta.id, expectedHash });
+  if (exists && !bundle.expectedHash) throw new HttpError(428, 'expectedHash is required to confirm the existing problem.');
+  if (exists && bundle.expectedHash !== expectedHash) throw new HttpError(409, 'Problem changed since confirmation. Import again to review the latest version.', { code: 'problem_changed' });
+  if (!exists && bundle.overwrite === true) throw new HttpError(409, 'Problem disappeared since confirmation. Import again.', { code: 'problem_changed' });
   const parent = path.dirname(dir);
   fs.mkdirSync(parent, { recursive: true });
   const staging = fs.mkdtempSync(path.join(parent, '.import-'));
+  let backup;
   try {
     for (const [filename, content] of Object.entries(files)) {
       if (!/^[A-Za-z0-9_-]+\.(c|h)$/.test(filename) || typeof content !== 'string' || Buffer.byteLength(content) > 1024 * 1024) throw new HttpError(400, 'Invalid framework file.');
@@ -77,10 +99,18 @@ export function importBundle(bundle) {
     fs.writeFileSync(path.join(staging, 'manifest.json'), JSON.stringify({ ...meta, sources, headers }, null, 2) + '\n');
     fs.writeFileSync(path.join(staging, 'description.md'), description);
     fs.writeFileSync(path.join(staging, 'tests.json'), JSON.stringify(tests, null, 2) + '\n');
-    fs.renameSync(staging, dir);
+    if (exists) {
+      if (problemFingerprint(dir) !== expectedHash) throw new HttpError(409, 'Problem changed while preparing the import. Import again.', { code: 'problem_changed' });
+      const backupRoot = path.join(dataDir, 'import-backups');
+      fs.mkdirSync(backupRoot, { recursive: true });
+      backup = path.join(backupRoot, `${meta.id}-${Date.now()}-${crypto.randomUUID()}`);
+      fs.renameSync(dir, backup);
+    }
+    try { fs.renameSync(staging, dir); }
+    catch (error) { if (backup) { fs.renameSync(backup, dir); backup = undefined; } throw error; }
   } catch (error) {
     fs.rmSync(staging, { recursive: true, force: true });
     throw error;
   }
-  return meta.id;
+  return { id: meta.id, overwritten: exists, ...(backup ? { backupPath: path.relative(dataDir, backup) } : {}) };
 }

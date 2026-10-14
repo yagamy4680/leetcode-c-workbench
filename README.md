@@ -93,7 +93,7 @@ Here, `WB_DATA_DIR` must be a shell variable containing the actual workspace pat
 
 ## Framework and ownership
 
-New REST/web imports and newly seeded example problems prepend [templates/solution-preamble.c](templates/solution-preamble.c) to `solution-master.c`. Existing workspace solutions are preserved. The prefix stays in submission snapshots and copied LeetCode code. Debug mode defines `DEBUG`, enabling `DBG()` output on stderr with file, line, and function; performance mode and ordinary LeetCode compilation leave it disabled. The disabled macro does not evaluate arguments. Both `DBG("message\n")` and `DBG("value=%d\n", value)` are supported using the GNU11 variadic-macro extension. Cloned variants inherit the prefix from their source.
+New REST/web imports and newly seeded example problems prepend [templates/solution-preamble.c](templates/solution-preamble.c) to `solution-master.c`. Existing workspace solutions are preserved unless you explicitly confirm an import overwrite. The prefix stays in submission snapshots and copied LeetCode code. Debug mode defines `DEBUG`, enabling `DBG()` output on stderr with file, line, and function; performance mode and ordinary LeetCode compilation leave it disabled. The disabled macro does not evaluate arguments. Both `DBG("message\n")` and `DBG("value=%d\n", value)` are supported using the GNU11 variadic-macro extension. Cloned variants inherit the prefix from their source.
 
 Each problem includes at least `manifest.json`, `description.md`, `solution.h`, `main.c`, `solution-master.c`, and `tests.json`.
 
@@ -115,7 +115,7 @@ Local test association requires identical **solution, framework, helpers, metada
 
 ```text
 Application checkout: server/, runner/, runtime/, examples/, web/
-External workspace:  problems/, runs/, builds/, snapshots/, workbench.db
+External workspace:  problems/, runs/, builds/, snapshots/, import-backups/, workbench.db
 ```
 
 Personal solutions and credentials stay outside the application repository. The snapshot Git repository has no remote by default. Application updates preserve existing personal problem directories. Back up the entire workspace, including SQLite and the snapshot Git repository; stopping the service simplifies backups.
@@ -132,7 +132,7 @@ To import problem 94 into an existing deployment without restarting it, load [bu
 python3 scripts/export-bundle.py examples/94 > /tmp/problem-94.json
 ```
 
-Sign in to your workbench, open **Import problem**, and paste the JSON bundle. Importing an existing ID is rejected to preserve its files. Alternatively, `npm run setup` seeds missing examples after updating the checkout.
+Sign in to your workbench, open **Import problem**, and paste the JSON bundle. If the ID already exists, the interface asks whether to overwrite it. Confirmation replaces the description, tests, framework, and all solution variants with the bundle. The previous problem directory is retained under `$WB_DATA_DIR/import-backups/`; the success message shows its path. Runs and submission snapshots remain available. If the problem changes after confirmation, the overwrite is rejected; import again to review its current version. Finish CLI runs before replacing their problem; active web runs block overwrite. Alternatively, `npm run setup` seeds missing examples after updating the checkout.
 
 Keep `WB_USER` and `WB_PASSWORD` in your local ignored `.env`, protected with `chmod 600 .env`. Never paste passwords into chat or include them in URLs, command arguments, bundles, or Git commits. For API access from your Mac, `curl --user "$WB_USER"` prompts privately for the password; do not append it to the argument. Browser credential collection requires a supported secure authentication flow; this application's HTTP Basic Auth is not an HTML login form.
 

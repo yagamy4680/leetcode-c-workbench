@@ -7,7 +7,7 @@ const date = value => new Date(value).toLocaleString(undefined, { month: 'short'
 function notice(text, error = false) { $('notice').hidden = !text; $('notice').textContent = text; $('notice').className = error ? 'error' : ''; }
 async function api(url, options = {}) {
   const res = await fetch(url, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
-  if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(body.error || `Request failed (${res.status}).`); }
+  if (!res.ok) { const body = await res.json().catch(() => ({})); throw Object.assign(new Error(body.error || `Request failed (${res.status}).`), { status: res.status, details: body }); }
   return res;
 }
 async function json(url, method = 'GET', body) { return (await api(url, { method, ...(body ? { body: JSON.stringify(body) } : {}) })).json(); }
@@ -108,8 +108,8 @@ async function loadCode(variant = state.variant, epoch = ++state.viewEpoch) {
   } catch (error) { if (epoch === state.viewEpoch) $('variant').value = state.variant; throw error; }
   finally { if (epoch === state.viewEpoch) state.loading = false; }
 }
-async function loadProblem(id, keepTab = false) {
-  if ((dirty() || testsDirty()) && !confirm('Discard unsaved browser changes and reload?')) return;
+async function loadProblem(id, keepTab = false, discardConfirmed = false) {
+  if (!discardConfirmed && (dirty() || testsDirty()) && !confirm('Discard unsaved browser changes and reload?')) return;
   const epoch = ++state.viewEpoch; state.loading = true;
   try {
   const p = await json(`/api/problems/${id}`);
@@ -261,7 +261,27 @@ bind('tools-btn', 'click', async () => { $('tools').hidden = !$('tools').hidden;
 bind('probe-btn', 'click', async () => { $('probe-btn').disabled = true; try { await capabilities(true); } finally { $('probe-btn').disabled = false; } });
 bind('import-btn', 'click', () => { if (navigationBusy()) return notice('Wait for the current operation to finish.'); $('import-error').textContent = ''; $('import-dialog').showModal(); });
 bind('bundle-file', 'change', async () => { if ($('bundle-file').files[0]) $('bundle').value = await $('bundle-file').files[0].text(); });
-bind('import-submit', 'click', async () => { if (navigationBusy()) { $('import-error').textContent = 'Wait for the current operation to finish.'; return; } state.preparing = true; $('import-submit').disabled = true; try { const result = await json('/api/problems', 'POST', JSON.parse($('bundle').value)); $('import-dialog').close(); await refresh(); await loadProblem(result.id); } catch (error) { $('import-error').textContent = error.message; notice(error.message, true); } finally { state.preparing = false; $('import-submit').disabled = false; } });
+bind('import-submit', 'click', async () => {
+  if (navigationBusy()) { $('import-error').textContent = 'Wait for the current operation to finish.'; return; }
+  state.preparing = true; $('import-submit').disabled = true; $('import-error').textContent = '';
+  try {
+    // Confirmation fields are request-only; never trust them from an uploaded bundle.
+    const { overwrite, expectedHash, ...bundle } = JSON.parse($('bundle').value);
+    if ((dirty() || testsDirty()) && !confirm('Import and open this problem? Unsaved browser edits will be discarded. Copy them first if needed.')) return;
+    let result;
+    try { result = await json('/api/problems', 'POST', bundle); }
+    catch (error) {
+      if (error.status !== 409 || error.details?.code !== 'problem_exists') throw error;
+      if (!confirm(`Problem ${error.details.id} already exists. Overwrite its description, tests, framework, and ALL solution variants with this bundle? The old problem files will be backed up; run and submission history will remain.`)) {
+        $('import-error').textContent = 'Import cancelled. Existing problem files were kept.'; return;
+      }
+      result = await json('/api/problems', 'POST', { ...bundle, overwrite: true, expectedHash: error.details.expectedHash });
+    }
+    $('import-dialog').close(); await refresh(); await loadProblem(result.id, false, true);
+    notice(result.overwritten ? `Problem replaced. Previous files saved in ${result.backupPath}.` : 'Problem imported.');
+  } catch (error) { $('import-error').textContent = error.message; notice(error.message, true); }
+  finally { state.preparing = false; $('import-submit').disabled = false; }
+});
 bind('prepare-btn', 'click', async () => { if (navigationBusy()) return notice('Wait for the current operation to finish.'); state.preparing = true; $('prepare-btn').disabled = true; const id = state.problem.id, variant = state.variant; try { await saveCode(); showSnapshot(await json(`/api/problems/${id}/submissions`, 'POST', { solution: variant, sourceHash: state.sourceHash })); } finally { state.preparing = false; $('prepare-btn').disabled = false; } });
 bind('copy-code', 'click', async () => { try { await navigator.clipboard.writeText($('submission-code').value); notice('Snapshot code copied.'); } catch { $('submission-code').focus(); $('submission-code').select(); $('submission-error').textContent = 'Press ⌘/Ctrl C to copy the selected code.'; } });
 bind('save-submission', 'click', async () => { const id = state.snapshot.problemId; $('save-submission').disabled = true; try { await json(`/api/submissions/${state.snapshot.id}`, 'PATCH', { result: $('submission-result').value, memo: $('submission-memo').value }); const problem = await json(`/api/problems/${id}`); if (state.problem.id === id) { state.problem = problem; renderHistory(); } $('submission-dialog').close(); notice('Submission result saved.'); } catch (error) { $('submission-error').textContent = error.message; } finally { $('save-submission').disabled = false; } });
