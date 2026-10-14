@@ -13,6 +13,7 @@
   <script src="/vendor/prism-core.js" data-manual defer></script>
   <script src="/vendor/prism-clike.js" defer></script>
   <script src="/vendor/prism-c.js" defer></script>
+  <script src="/test-case.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -99,6 +100,18 @@
         <section id="tests-tab" class="tab-panel" hidden aria-labelledby="tests-title">
           <div class="section-heading"><h3 id="tests-title">Test cases</h3><div><button type="button" id="add-case" class="btn btn-sm btn-outline-secondary">Add case</button> <button type="button" id="save-tests" class="btn btn-sm btn-primary">Save test cases</button></div></div>
           <p class="muted">Each case has an id, input and expected result. Optional: timeoutMs, compare (exact / unordered / float), tolerance.</p>
+          <form id="case-form" class="case-form" hidden aria-labelledby="case-form-title">
+            <h4 id="case-form-title">Add a LeetCode test case</h4>
+            <p class="muted">Paste JSON values or LeetCode input such as <code>root = [1,null,2]</code>. For multiple inputs, use a JSON object or one named assignment per field. Arrays stay in scrollable text areas, including large trees. Maximum new-case request: 12 MiB.</p>
+            <label for="case-id">Case name</label><input id="case-id" class="form-control" required pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,63}" maxlength="64">
+            <label for="case-input">Input</label><p id="case-input-hint" class="muted"></p>
+            <textarea id="case-input" class="form-control case-paste" spellcheck="false" wrap="off" aria-describedby="case-input-hint" required></textarea>
+            <label for="case-expected">Expected output</label><p id="case-expected-hint" class="muted"></p>
+            <textarea id="case-expected" class="form-control case-paste" spellcheck="false" wrap="off" aria-describedby="case-expected-hint" required></textarea>
+            <p id="case-size" class="muted" role="status"></p>
+            <p id="case-error" class="error-text" role="alert"></p>
+            <div class="case-actions"><button id="case-submit" type="submit" class="btn btn-primary">Save new test case</button><button id="case-cancel" type="button" class="btn btn-outline-secondary">Cancel</button></div>
+          </form>
           <label for="tests-json">Test data (JSON)</label><textarea id="tests-json" class="form-control json-editor" spellcheck="false"></textarea>
         </section>
         <article id="description-tab" class="tab-panel prose" hidden></article>

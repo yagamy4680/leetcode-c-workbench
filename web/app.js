@@ -109,7 +109,7 @@ async function loadCode(variant = state.variant, epoch = ++state.viewEpoch) {
   finally { if (epoch === state.viewEpoch) state.loading = false; }
 }
 async function loadProblem(id, keepTab = false, discardConfirmed = false) {
-  if (!discardConfirmed && (dirty() || testsDirty()) && !confirm('Discard unsaved browser changes and reload?')) return;
+  if (!discardConfirmed && (dirty() || testsDirty() || caseFormDirty()) && !confirm('Discard unsaved browser changes and reload?')) return;
   const epoch = ++state.viewEpoch; state.loading = true;
   try {
   const p = await json(`/api/problems/${id}`);
@@ -119,6 +119,7 @@ async function loadProblem(id, keepTab = false, discardConfirmed = false) {
   if (epoch !== state.viewEpoch) return;
   // Commit the identity and editor together only after both requests succeed.
   state.problem = p;
+  $('case-form').hidden = true; $('case-input').value = ''; $('case-expected').value = '';
   $('problem').hidden = false; $('empty').hidden = true; $('problem-title').textContent = `${p.id}. ${p.title}`;
   $('problem-meta').textContent = `${p.difficulty} · ${p.manifest.topics.join(' · ')}`;
   const original = /^https:\/\/leetcode\.com\/problems\//.test(p.url) ? p.url : 'https://leetcode.com';
@@ -144,6 +145,7 @@ async function saveCode() {
   try { await state.savingCode; } finally { state.savingCode = null; }
 }
 async function saveTests() {
+  if (state.preparing) throw new Error('Wait for the current operation to finish before saving tests.');
   if (state.loading) throw new Error('Wait for the problem to load before saving.');
   if (state.savingTests) { await state.savingTests; if (testsDirty()) return saveTests(); return; }
   const id = state.problem.id, submitted = $('tests-json').value, tests = JSON.parse(submitted), expectedHash = state.testsHash;
@@ -152,6 +154,51 @@ async function saveTests() {
     if (state.problem.id === id) { state.testsHash = result.hash; state.savedTests = submitted; state.problem.tests = tests; $('case-select').innerHTML = '<option value="">All cases</option>' + tests.map(t => `<option>${esc(t.id)}</option>`).join(''); notice(testsDirty() ? 'Submitted test cases saved; newer edits remain unsaved.' : 'Test cases saved.'); }
   })();
   try { await state.savingTests; } finally { state.savingTests = null; }
+}
+function caseFormDirty() { return !$('case-form').hidden && Boolean($('case-input').value || $('case-expected').value); }
+function openCaseForm() {
+  if (navigationBusy()) return notice('Wait for the current operation to finish.');
+  if (!$('case-form').hidden) return $('case-input').focus();
+  const tests = JSON.parse($('tests-json').value);
+  const shape = WbTestCase.summary(tests);
+  let n = tests.length + 1; while (tests.some(test => test.id === `leetcode${n}`)) n++;
+  $('case-id').value = `leetcode${n}`; $('case-input').value = ''; $('case-expected').value = '';
+  $('case-input-hint').textContent = 'Detected input: ' + shape.input;
+  $('case-expected-hint').textContent = 'Detected expected output: ' + shape.expected + '. Quote strings to preserve whitespace.';
+  $('case-error').textContent = ''; $('case-size').textContent = ''; $('case-form').hidden = false; $('case-input').focus();
+}
+async function addPastedCase(event) {
+  event.preventDefault();
+  if (navigationBusy()) return;
+  $('case-error').textContent = '';
+  try {
+    if (testsDirty()) throw new Error('Save existing JSON test edits before adding a new case. Your pasted values are kept.');
+    const before = $('tests-json').value;
+    const tests = state.problem.tests, id = $('case-id').value.trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(id)) throw new Error('Use 1–64 letters, digits, underscores, or hyphens for the case name.');
+    if (tests.some(test => test.id === id)) throw new Error('This case name already exists. Choose another name.');
+    if ($('case-input').value.length + $('case-expected').value.length > 12 * 1024 * 1024) throw new Error('Pasted values exceed the 12 MiB request limit. Reduce their size before saving.');
+    const parsed = WbTestCase.parse($('case-input').value, $('case-expected').value, tests);
+    const compare = tests.find(test => test.compare)?.compare || 'exact';
+    const testcase = { id, ...parsed, compare };
+    if (compare === 'float') testcase.tolerance = tests.find(test => test.compare === 'float' && test.tolerance !== undefined)?.tolerance ?? 1e-6;
+    const body = JSON.stringify({ test: testcase, expectedHash: state.testsHash });
+    if (new TextEncoder().encode(body).byteLength > 12 * 1024 * 1024) throw new Error('This case exceeds the 12 MiB request limit. Reduce its size before saving.');
+    const problemId = state.problem.id; state.preparing = true;
+    $('case-submit').disabled = true; $('case-cancel').disabled = true; $('save-tests').disabled = true; $('tests-json').readOnly = true;
+    for (const field of ['case-id', 'case-input', 'case-expected']) $(field).readOnly = true;
+    const result = await api(`/api/problems/${problemId}/tests`, { method: 'POST', body }).then(response => response.json());
+    const appended = [...tests, testcase];
+    state.testsHash = result.hash; state.problem.tests = appended; state.savedTests = JSON.stringify(appended, null, 2);
+    if ($('tests-json').value === before) $('tests-json').value = state.savedTests;
+    $('case-select').innerHTML = '<option value="">All cases</option>' + appended.map(test => `<option>${esc(test.id)}</option>`).join('');
+    $('case-form').hidden = true; $('case-input').value = ''; $('case-expected').value = '';
+    notice(`Test case ${id} saved. Select it in Run tests to reproduce the failure.`); $('add-case').focus();
+  } catch (error) { $('case-error').textContent = error.message; }
+  finally {
+    state.preparing = false; $('case-submit').disabled = false; $('case-cancel').disabled = false; $('save-tests').disabled = false; $('tests-json').readOnly = false;
+    for (const field of ['case-id', 'case-input', 'case-expected']) $(field).readOnly = false;
+  }
 }
 function renderCases(report) {
   $('case-results').innerHTML = report.cases.length ? `<table class="case-table"><thead><tr><th scope="col">Case</th><th scope="col">Result</th><th scope="col">Time</th><th scope="col">Details</th></tr></thead><tbody>${report.cases.map(c => `<tr><td>${esc(c.id)}</td><td class="status-${c.status === 'passed' ? 'passed' : 'error'}">${esc(label(c.status))}</td><td>${c.durationMs} ms</td><td><button type="button" class="btn btn-link btn-sm" data-case-log="${esc(c.id)}">Log</button>${c.status !== 'passed' ? `<details><summary>Input / result</summary><pre class="case-detail">${esc(JSON.stringify({ input: c.input, expected: c.expected, actual: c.actual, difference: c.difference, error: c.error }, null, 2))}</pre></details>` : ''}</td></tr>`).join('')}</tbody></table>` : '';
@@ -255,7 +302,10 @@ bind('run-btn', 'click', runTests);
 bind('clone-btn', 'click', () => { $('clone-form').hidden = !$('clone-form').hidden; if (!$('clone-form').hidden) $('new-name').focus(); });
 bind('clone-form', 'submit', async e => { e.preventDefault(); if (navigationBusy()) return notice('Wait for the current operation to finish.'); state.preparing = true; const id = state.problem.id; try { await saveCode(); const variant = $('new-name').value; await json(`/api/problems/${id}/solutions`, 'POST', { name: variant, from: state.variant }); state.variant = variant; $('clone-form').hidden = true; await loadProblem(id, true); } finally { state.preparing = false; } });
 bind('save-tests', 'click', saveTests);
-bind('add-case', 'click', () => { const tests = JSON.parse($('tests-json').value); let n = tests.length + 1; while (tests.some(t => t.id === `case${n}`)) n++; tests.push({ id: `case${n}`, input: {}, expected: null }); $('tests-json').value = JSON.stringify(tests, null, 2); $('tests-json').focus(); $('tests-json').scrollTop = $('tests-json').scrollHeight; });
+bind('add-case', 'click', openCaseForm);
+bind('case-form', 'submit', addPastedCase);
+bind('case-cancel', 'click', () => { $('case-form').hidden = true; $('case-input').value = ''; $('case-expected').value = ''; $('add-case').focus(); });
+for (const id of ['case-input', 'case-expected']) bind(id, 'input', () => { $('case-size').textContent = `${$('case-input').value.length.toLocaleString()} input characters · ${$('case-expected').value.length.toLocaleString()} expected characters`; });
 bind('log-source', 'change', showLog); bind('log-stream', 'change', showLog);
 bind('tools-btn', 'click', async () => { $('tools').hidden = !$('tools').hidden; $('tools').open = true; if (!$('tools').hidden) await capabilities(); });
 bind('probe-btn', 'click', async () => { $('probe-btn').disabled = true; try { await capabilities(true); } finally { $('probe-btn').disabled = false; } });
@@ -267,7 +317,7 @@ bind('import-submit', 'click', async () => {
   try {
     // Confirmation fields are request-only; never trust them from an uploaded bundle.
     const { overwrite, expectedHash, ...bundle } = JSON.parse($('bundle').value);
-    if ((dirty() || testsDirty()) && !confirm('Import and open this problem? Unsaved browser edits will be discarded. Copy them first if needed.')) return;
+    if ((dirty() || testsDirty() || caseFormDirty()) && !confirm('Import and open this problem? Unsaved browser edits will be discarded. Copy them first if needed.')) return;
     let result;
     try { result = await json('/api/problems', 'POST', bundle); }
     catch (error) {
@@ -298,6 +348,6 @@ document.addEventListener('click', e => {
   action().catch(error => notice(error.message, true));
 });
 document.addEventListener('keydown', e => { if (!(e.metaKey || e.ctrlKey) || !state.problem || document.querySelector('dialog[open]')) return; if (e.key === 's' && !$('solution-tab').hidden) { e.preventDefault(); saveCode().catch(error => notice(error.message, true)); } if (e.key === 'Enter') { e.preventDefault(); runTests().catch(error => notice(error.message, true)); } });
-window.addEventListener('beforeunload', e => { if (dirty() || testsDirty()) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (dirty() || testsDirty() || caseFormDirty()) { e.preventDefault(); e.returnValue = ''; } });
 window.addEventListener('resize', syncEditorScroll);
 refresh().catch(error => { $('problems').innerHTML = '<p class="muted">Could not load problems. Use Refresh to try again.</p>'; notice(error.message, true); });

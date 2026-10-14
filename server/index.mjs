@@ -113,6 +113,14 @@ export async function createApp(db = createDatabaseClient()) {
     await syncProblem(db, req.params.id);
     res.status(201).json({ name: variant });
   });
+  app.post('/api/problems/:id/tests', (req, res) => {
+    const file = ownedFile(problemDir(req.params.id), 'tests.json');
+    const tests = readJSON(file);
+    validateTests([...tests, req.body?.test]);
+    const content = JSON.stringify([...tests, req.body?.test], null, 2) + '\n';
+    const newHash = saveChecked(file, content, req.body.expectedHash);
+    res.status(201).json({ hash: newHash });
+  });
   app.put('/api/problems/:id/tests', (req, res) => {
     validateTests(req.body.tests);
     const content = JSON.stringify(req.body.tests, null, 2) + '\n';

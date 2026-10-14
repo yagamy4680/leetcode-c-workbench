@@ -51,6 +51,30 @@ CLI tests require neither the Node.js server nor SQLite. The server imports comp
 
 Exit codes: `0` for all tests passing, `1` for compilation or test failure, `2` for configuration or framework errors, and `130` for user interruption.
 
+## Fetching and validating problems
+
+Follow [skills/fetch-leetcode-problem/SKILL.md](skills/fetch-leetcode-problem/SKILL.md)
+when fetching or refetching LeetCode problems. Repository `AGENTS.md` points agents
+to this workflow. It covers official C signatures, Markdown images, local helpers,
+TODO solutions, test data, validation, and authenticated import boundaries.
+See [docs/problem-bundle.md](docs/problem-bundle.md) and
+[docs/problem.schema.json](docs/problem.schema.json) for the bundle contract.
+
+```bash
+npm ci
+node scripts/validate-problem.mjs bundles/problem-94.json
+npm run validate:problem -- --json bundles/problem-94.json
+```
+
+In the web interface, open **Tests → Add case** to paste LeetCode's input and
+expected output. Paste a single array/integer/string or named inputs such as
+`root = [1,null,2]`; multiple fields can be a JSON object or one assignment per
+field. The form infers types from existing saved cases, saves only the new case,
+and leaves existing tests intact. Quote strings to preserve whitespace. Large
+arrays/trees use scrollable text areas with no per-node preview. Errors preserve
+your pasted values. Save any existing JSON editor changes before adding a case.
+After saving, select the new case in **Run tests** to reproduce the failure.
+
 ## Testing and debugging
 
 Debug mode uses GNU11, `-O1 -g`, warnings, ASan, UBSan, and frame pointers. Performance mode uses `-O2` with sanitizers disabled. Set `CC` to select a compiler; otherwise, the runner prefers `clang`, then `cc`. `CC` must be an executable path, without additional flags.

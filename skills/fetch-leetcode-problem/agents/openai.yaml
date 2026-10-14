@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch LeetCode Problem"
+  short_description: "Build and validate C workbench problem bundles"
+  default_prompt: "Use $fetch-leetcode-problem to retrieve this LeetCode problem and create a validated workbench JSON bundle."

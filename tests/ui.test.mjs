@@ -20,7 +20,7 @@ function response(value) { return new Response(typeof value==='string'?value:JSO
 async function harness(handler=()=>undefined) {
   const dom=new JSDOM(html,{runScripts:'outside-only',url:'http://127.0.0.1:3089/'}),w=dom.window,calls=[];
   w.marked=marked;w.DOMPurify=createDOMPurify(w);w.confirm=()=>true;w.Prism=Prism;
-  w.TextDecoder=TextDecoder;
+  w.TextDecoder=TextDecoder;w.TextEncoder=TextEncoder;
   w.EventSource=class {
     static instances=[];
     constructor(url){this.url=url;w.EventSource.instances.push(this);}
@@ -37,7 +37,8 @@ async function harness(handler=()=>undefined) {
     if(route.endsWith('/solutions/master'))return response({code:'initial',hash:'source-hash'});
     throw new Error(`Unexpected request ${call.method} ${route}`);
   };
-  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode,refreshExternalCode};');
+  w.eval(fs.readFileSync('web/test-case.js','utf8'));
+  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode,refreshExternalCode,openCaseForm,addPastedCase};');
   await pause();await w.hooks.loadProblem(1480);
   return {w,calls,$:id=>w.document.getElementById(id),close:()=>w.close()};
 }
@@ -201,4 +202,48 @@ test('problem images render from official asset URLs with alt text and unsafe HT
   assert.equal(images[0].src,'https://assets.leetcode.com/uploads/2024/08/29/screenshot-2024-08-29-202743.png');
   assert.equal(images[1].src,'https://assets.leetcode.com/uploads/2024/08/29/tree_2.png');
   assert.ok(images[0].alt);assert.equal(h.$('description-tab').querySelector('script'),null);h.close();
+});
+
+test('pasted LeetCode values append a case without rewriting existing cases',async()=>{
+  let submitted;const h=await harness(call=>call.method==='POST'&&call.route.endsWith('/tests')?(submitted=call.body,response({hash:'appended-hash'})):undefined);
+  h.w.hooks.openCaseForm();h.$('case-input').value='nums = [1,2,3]';h.$('case-expected').value='[1,3,6]';
+  await h.w.hooks.addPastedCase({preventDefault(){}});
+  assert.deepEqual(submitted.test.input,{nums:[1,2,3]});assert.deepEqual(submitted.test.expected,[1,3,6]);
+  assert.equal(submitted.expectedHash,'tests-hash');const tests=JSON.parse(h.$('tests-json').value);
+  assert.equal(tests.length,2);assert.equal(tests[0].id,'single');assert.equal(h.w.hooks.testsDirty(),false);
+  assert.equal(h.$('case-form').hidden,true);h.close();
+});
+test('wrong pasted types report an inline error while preserving the pasted data',async()=>{
+  const h=await harness();h.w.hooks.openCaseForm();h.$('case-input').value='42';h.$('case-expected').value='[1]';
+  await h.w.hooks.addPastedCase({preventDefault(){}});
+  assert.equal(h.$('case-input').value,'42');assert.match(h.$('case-error').textContent,/should be array/);
+  assert.equal(h.calls.filter(call=>call.method==='POST').length,0);h.close();
+});
+test('multi-field inputs, strings, empty values and 5001-node trees parse without node DOM rendering',async()=>{
+  const h=await harness();const parse=h.w.WbTestCase.parse;
+  const multi=[{input:{nums:[1],target:1},expected:1}];
+  assert.equal(parse('nums = [2,7,11,15]\ntarget = 9','2',multi).input.target,9);
+  const strings=[{input:{s:'a'},expected:'b'}];assert.equal(parse('""','""',strings).input.s,'');
+  const nodes=Array.from({length:5001},(_,i)=>i);const tree=[{input:{root:[1,null,2]},expected:[1,2]}];
+  const result=parse('root = '+JSON.stringify(nodes),JSON.stringify(nodes),tree);
+  assert.equal(result.input.root.length,5001);assert.equal(result.expected.length,5001);
+  assert.equal(h.$('case-form').querySelectorAll('textarea').length,2);h.close();
+});
+test('test-case append conflicts keep pasted input and existing JSON unchanged',async()=>{
+  const h=await harness(call=>call.method==='POST'&&call.route.endsWith('/tests')?new Response(JSON.stringify({error:'File changed on disk. Reload before saving.'}),{status:409}):undefined);
+  const before=h.$('tests-json').value;h.w.hooks.openCaseForm();h.$('case-input').value='[2]';h.$('case-expected').value='[2]';
+  await h.w.hooks.addPastedCase({preventDefault(){}});
+  assert.equal(h.$('tests-json').value,before);assert.equal(h.$('case-input').value,'[2]');assert.equal(h.$('case-form').hidden,false);
+  assert.match(h.$('case-error').textContent,/File changed/);assert.equal(h.$('case-submit').disabled,false);h.close();
+});
+
+test('adding a testcase locks bulk saves and preserves newer editor changes during acknowledgement',async()=>{
+  const ack=deferred();const h=await harness(call=>call.method==='POST'&&call.route.endsWith('/tests')?ack.promise:undefined);
+  h.w.hooks.openCaseForm();h.$('case-input').value='[1]';h.$('case-expected').value='[1]';
+  const pending=h.w.hooks.addPastedCase({preventDefault(){}});
+  assert.equal(h.$('save-tests').disabled,true);assert.equal(h.$('tests-json').readOnly,true);
+  await assert.rejects(h.w.hooks.saveTests(),/Wait for the current operation/);
+  h.$('tests-json').value='newer editor draft';ack.resolve(response({hash:'new-tests'}));await pending;
+  assert.equal(h.$('tests-json').value,'newer editor draft');assert.equal(h.w.hooks.testsDirty(),true);
+  assert.equal(h.$('save-tests').disabled,false);h.close();
 });

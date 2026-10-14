@@ -175,3 +175,16 @@ test('failed replacement installation restores the original problem directory',a
   } finally {fs.renameSync=rename;}
   assert.equal(fs.readFileSync(file,'utf8'),'/* preserve after failed installation */');
 });
+
+test('appending a testcase validates it and preserves every previous case with CAS',async()=>{
+  const dir=path.join(data,'problems/94/tests.json'),before=fs.readFileSync(dir,'utf8');
+  const problem=await(await request('/api/problems/94')).json();
+  const testCase={id:'leetcode-large',input:{root:Array.from({length:5001},(_,i)=>i)},expected:[]};
+  assert.equal((await request('/api/problems/94/tests','POST',{test:testCase,expectedHash:'stale'})).status,409);
+  assert.equal(fs.readFileSync(dir,'utf8'),before);
+  const result=await request('/api/problems/94/tests','POST',{test:testCase,expectedHash:problem.testsHash});assert.equal(result.status,201);
+  const ack=await result.json(),tests=JSON.parse(fs.readFileSync(dir,'utf8'));assert.deepEqual(tests.slice(0,-1),problem.tests);
+  assert.equal(tests.at(-1).input.root.length,5001);
+  assert.equal((await request('/api/problems/94/tests','POST',{test:testCase,expectedHash:ack.hash})).status,400);
+  assert.deepEqual(JSON.parse(fs.readFileSync(dir,'utf8')),tests);
+});
