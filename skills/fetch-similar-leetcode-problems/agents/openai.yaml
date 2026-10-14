@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fetch Similar LeetCode Problems"
+  short_description: "Collect similar questions as validated workbench ZIPs"
+  default_prompt: "Use $fetch-similar-leetcode-problems to collect the direct Similar Questions for this LeetCode URL and deliver validated problem JSON files in one ZIP."

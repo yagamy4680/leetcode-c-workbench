@@ -262,6 +262,21 @@ A text run state and summary sit above the case table. Each case offers a log ac
 
 Import and submission use native dialogs with labeled controls and visible Close buttons. Import and submission errors use alert regions. The global notice and run state use polite live announcements. The submission dialog names the fixed snapshot, its commit, and local test status before copy and result recording.
 
+The import dialog includes a native expandable ZIP workflow. Preview presents
+one compact table row per problem, with a labeled action selector: new problems
+default to Import and existing problems to Skip. Overwrite is an explicit choice
+followed by confirmation. The preview table is bounded at 360px; unavailable
+question and outcome lists are bounded at 200px. Written per-problem outcomes,
+backup paths, inline errors, and a polite summary explain completion without
+replacing the active source editor or its unsaved text.
+
+### Related questions
+
+The Description tab appends a Similar questions section when metadata exists.
+Ordinary list links show the official title, optional ID, difficulty, and known
+premium status. Links open the canonical LeetCode page in another tab; no new
+cards, badges, or color tokens are introduced.
+
 ## Do's and Don'ts
 
 ### Do:

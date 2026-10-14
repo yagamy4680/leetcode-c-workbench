@@ -46,6 +46,15 @@ and only framework `.c` names, excluding names beginning with `solution-`.
 `headers` defaults to `[]`. Every listed source/header must appear in `files`.
 Use explicit lists when adding local helpers.
 
+Optional `manifest.similarQuestions` lists official related problems. Each entry
+requires `title`, `slug`, canonical `https://leetcode.com/problems/<slug>/` URL,
+and `difficulty`; verified numeric `id`, official string `frontendId`, and
+boolean `isPaidOnly` are optional. Up to 100 unique slugs are supported and each
+URL must match its slug. Older bundles may omit the field. Use `[]` for an
+officially empty list. The Description tab renders these as external links.
+See [problem-collections.md](problem-collections.md) for examples and ZIP batch
+import. Every JSON inside a ZIP uses this same standalone bundle format.
+
 `files` requires `main.c`, `solution.h`, and `solution-master.c`. It can contain
 at most 64 entries. Names match `^[A-Za-z0-9_-]+\.(c|h)$`; paths, dots in the
 stem, and directory traversal are rejected. Each value is a string, at most
@@ -91,7 +100,8 @@ change the runner's compilation command.
 
 The JSON Schema checks types, required fields, patterns, enums, and count/range
 limits. The shared validator additionally checks file references, duplicate
-case IDs, UTF-8 source size, the master-plus-preamble limit, and bundle size.
+case IDs, related-question slugs and links, UTF-8 source size, the
+master-plus-preamble limit, and bundle size.
 Server imports call it before staging, duplicate detection, or overwriting, so
 invalid bundles never replace existing problem files. Test edits use the same
 test rules. This intentionally rejects formerly tolerated malformed optional

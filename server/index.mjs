@@ -9,6 +9,7 @@ import { createDatabaseClient, ensureDatabase } from './database.mjs';
 import { HttpError, hash, readJSON, name, problemDir, ownedFile, solutionFile, atomic, saveChecked, validateTests, importBundle } from './workspace.mjs';
 import { createIndexer, syncProblem } from './indexer.mjs';
 
+import { createBatchImports } from './batch-import.mjs';
 import { createSourceEvents } from './source-events.mjs';
 
 export function auth(req, res, next) {
@@ -69,6 +70,7 @@ export async function createApp(db = createDatabaseClient()) {
   }
   const sourceEvents = createSourceEvents();
   const active = new Set();
+  const batchImports = createBatchImports({ python, active, syncProblem: id => syncProblem(db, id) });
   const app = express();
   app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -95,6 +97,11 @@ export async function createApp(db = createDatabaseClient()) {
     app.get(`/vendor/prism-${language}.js`, (req, res) => res.sendFile(path.join(appDir, `node_modules/prismjs/components/prism-${language}.min.js`)));
   }
   app.use(express.static(path.join(appDir, 'web')));
+  app.post('/api/imports/preview', express.raw({ type: ['application/zip', 'application/octet-stream'], limit: '32mb' }), async (req, res) => {
+    try { res.json(await batchImports.preview(req.body)); }
+    catch (error) { throw new HttpError(400, error.message, { validationErrors: error.validationErrors }); }
+  });
+  app.post('/api/imports/commit', async (req, res) => res.json(await batchImports.commit(req.body)));
   app.get('/api/health', (req, res) => res.json({ ok: true }));
   app.get('/api/doctor', async (req, res) => res.json(await runCommand(['doctor', ...(req.query.refresh === '1' ? ['--refresh'] : [])])));
   app.get('/api/problems', async (req, res) => {
@@ -240,7 +247,7 @@ export async function createApp(db = createDatabaseClient()) {
   });
   const interval = setInterval(() => sync().catch(error => console.error('Indexing:', error.message)), 2000);
   interval.unref();
-  return { app, db, stopSourceEvents: () => sourceEvents.close(), close: async () => { clearInterval(interval); sourceEvents.close(); await db.$disconnect(); } };
+  return { app, db, stopSourceEvents: () => sourceEvents.close(), close: async () => { clearInterval(interval); sourceEvents.close(); batchImports.close(); await db.$disconnect(); } };
 }
 
 if (process.argv[1] === path.join(appDir, 'server/index.mjs')) {

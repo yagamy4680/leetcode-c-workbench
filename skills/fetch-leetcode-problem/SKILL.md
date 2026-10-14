@@ -23,13 +23,19 @@ shared validator in `server/problem-bundle.mjs` as the import rules authority.
 1. Open the user-supplied problem URL on `leetcode.com`; record the canonical
    problem ID, title, slug, difficulty, topics, description, examples,
    constraints, and follow-up. Do not infer the ID from a similar problem.
-2. Retrieve the official C starter snippet, including the function signature
+2. Retrieve official metadata including `similarQuestions`. The reusable helper
+   `python3 scripts/fetch-leetcode-question.py <url> --output-dir <staging>/sources`
+   supplies raw official evidence and normalized `workbenchSimilarQuestions`.
+   Copy those references to `manifest.similarQuestions`; resolve frontend IDs
+   when possible and omit unknown IDs rather than guessing. Retain verified
+   titles, slugs, canonical HTTPS URLs, difficulties, and premium flags.
+3. Retrieve the official C starter snippet, including the function signature
    and platform-provided structures. Use the rendered code selector or the
    public official GraphQL `question(titleSlug: ...)` fields `codeSnippets`,
    `content`, and metadata when available. Prefer `langSlug: "c"`. Do not use
    third-party solutions as the signature authority. If the C snippet is
    unavailable, identify the gap and request the snippet rather than invent it.
-3. Inspect the original description HTML and its image `src` attributes, or
+4. Inspect the original description HTML and its image `src` attributes, or
    follow the image links exposed by retrieval. Retain every important example
    image or diagram next to its associated example as Markdown:
 
@@ -43,7 +49,7 @@ shared validator in `server/problem-bundle.mjs` as the import rules authority.
    Do not embed cookies, passwords, or authenticated URLs. Retain readable
    examples, code, formulas, constraints, and the original problem link; use
    concise English paraphrases while preserving the technical requirements.
-4. Keep official examples separate from additional locally designed tests.
+5. Keep official examples separate from additional locally designed tests.
    Check expected values manually or with a test-only reference implementation.
    Do not claim hidden-test coverage or native Mac verification without evidence.
 
@@ -122,3 +128,7 @@ unavailable sanitizer capabilities explicitly.
   Use only a fresh server-provided `expectedHash` after explicit consent.
 - State what was fetched, images retained, validation and native test results,
   runtime prerequisites, and whether the live import actually completed.
+
+For a ZIP of the seed's direct Similar Questions, follow
+[fetch-similar-leetcode-problems](../fetch-similar-leetcode-problems/SKILL.md)
+instead of recursively fetching every related link.

@@ -88,6 +88,53 @@ async function saveAcceptance() {
   } catch (error) { notice(error.message, true); }
   finally { state.accepting = false; renderAcceptance(); }
 }
+function renderSimilarQuestions(questions) {
+  const items = Array.isArray(questions) ? questions : [];
+  $('similar-questions').hidden = !items.length;
+  $('similar-list').innerHTML = items.map(question => {
+    const text = `${question.id ? question.id + '. ' : ''}${question.title} (${question.difficulty})${question.isPaidOnly ? ' · Premium' : ''}`;
+    return /^https:\/\/leetcode\.com\/problems\/[a-z0-9-]+\/$/.test(question.url) ? `<li><a href="${esc(question.url)}" target="_blank" rel="noopener noreferrer">${esc(text)}</a></li>` : `<li>${esc(text)}</li>`;
+  }).join('');
+}
+let batchPreview = null;
+function batchBusy(value) {
+  for (const id of ['batch-preview-btn', 'batch-import-btn', 'batch-file', 'import-submit', 'bundle-file']) $(id).disabled = value;
+  $('batch-items').querySelectorAll('select').forEach(select => { select.disabled = value; });
+}
+async function previewBatch() {
+  if (navigationBusy()) return;
+  $('batch-error').textContent = ''; $('batch-summary').textContent = ''; $('batch-results').innerHTML = ''; $('batch-unavailable').innerHTML = '';
+  const file = $('batch-file').files[0];
+  if (!file) { $('batch-error').textContent = 'Choose a ZIP file first.'; return; }
+  if (file.size > 32 * 1024 * 1024) { $('batch-error').textContent = 'ZIP exceeds 32 MiB.'; return; }
+  batchPreview = null; $('batch-preview').hidden = true; state.preparing = true; batchBusy(true);
+  $('batch-summary').textContent = 'Validating ZIP…';
+  try {
+    batchPreview = await api('/api/imports/preview', { method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: file }).then(response => response.json());
+    $('batch-items').innerHTML = batchPreview.problems.map(problem => `<tr><td>${problem.id}. ${esc(problem.title)}</td><td>${problem.existing ? 'Existing' : 'New'}</td><td><select class="form-select form-select-sm" data-batch-id="${problem.id}" aria-label="Action for problem ${problem.id}">${problem.existing ? '<option value="skip">Skip</option><option value="overwrite">Overwrite (backup)</option>' : '<option value="import">Import</option><option value="skip">Skip</option>'}</select></td></tr>`).join('');
+    const unavailable = batchPreview.collectionReport?.unavailable ?? [];
+    $('batch-unavailable').innerHTML = unavailable.map(item => `<li>Unavailable: ${esc(item.slug)} · ${esc(item.reason)}</li>`).join('');
+    $('batch-preview').hidden = false; $('batch-summary').textContent = `${batchPreview.problems.length} validated problems. Choose actions, then import.`;
+  } catch (error) { $('batch-error').textContent = error.message; $('batch-summary').textContent = ''; }
+  finally { state.preparing = false; batchBusy(false); }
+}
+async function commitBatch() {
+  if (navigationBusy() || !batchPreview) return;
+  const items = [...$('batch-items').querySelectorAll('[data-batch-id]')].map(select => ({ id: Number(select.dataset.batchId), action: select.value }));
+  const overwrites = items.filter(item => item.action === 'overwrite');
+  if (!items.some(item => item.action !== 'skip')) { $('batch-error').textContent = 'Choose at least one problem to import.'; return; }
+  if (overwrites.length && !confirm(`Overwrite ${overwrites.length} existing problem(s), including ALL their solution variants? Previous files will be backed up. Accepted status and run/submission history are preserved.`)) return;
+  state.preparing = true; batchBusy(true); $('batch-error').textContent = ''; $('batch-summary').textContent = 'Importing selected problems…';
+  try {
+    const result = await json('/api/imports/commit', 'POST', { token: batchPreview.token, items, confirmedOverwrite: overwrites.length > 0 });
+    batchPreview = null; $('batch-preview').hidden = true;
+    $('batch-results').innerHTML = result.results.map(item => `<li class="${item.status === 'imported' ? 'status-passed' : item.status === 'failed' ? 'status-error' : ''}">${item.id}: ${esc(item.status)}${item.backupPath ? ` · backup: ${esc(item.backupPath)}` : ''}${item.error ? ` · ${esc(item.error)}` : ''}${item.indexPending ? ' · files imported; refresh to retry indexing' : ''}</li>`).join('');
+    $('batch-summary').textContent = `${result.results.filter(item => item.status === 'imported').length} imported · ${result.results.filter(item => item.status === 'skipped').length} skipped · ${result.results.filter(item => item.status === 'failed').length} failed.`;
+    // Refresh navigation only: preserve the active editor and any unsaved text.
+    try { await refresh(); } catch { notice('Batch finished. Use Refresh to reload the problem list.', true); }
+  } catch (error) { $('batch-error').textContent = error.message; $('batch-summary').textContent = 'No batch result received. Preview again to check the current workspace.'; }
+  finally { state.preparing = false; batchBusy(false); }
+}
 function applyCode(result, variant) {
   state.externalConflict = false;
   state.variant = variant; state.sourceHash = result.hash; state.savedCode = result.code;
@@ -168,7 +215,8 @@ async function loadProblem(id, keepTab = false, discardConfirmed = false) {
   $('problem-meta').textContent = `${p.difficulty} · ${p.manifest.topics.join(' · ')}`;
   const original = /^https:\/\/leetcode\.com\/problems\//.test(p.url) ? p.url : 'https://leetcode.com';
   $('original-link').href = original; $('submit-original').href = original;
-  $('description-tab').innerHTML = DOMPurify.sanitize(marked.parse(p.description));
+  $('description-body').innerHTML = DOMPurify.sanitize(marked.parse(p.description));
+  renderSimilarQuestions(p.manifest.similarQuestions);
   $('variant').innerHTML = p.solutions.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
   applyCode(code, variant);
   state.savedTests = JSON.stringify(p.tests, null, 2); $('tests-json').value = state.savedTests; state.testsHash = p.testsHash;
@@ -358,6 +406,9 @@ bind('log-source', 'change', showLog); bind('log-stream', 'change', showLog);
 bind('tools-btn', 'click', async () => { $('tools').hidden = !$('tools').hidden; $('tools').open = true; if (!$('tools').hidden) await capabilities(); });
 bind('probe-btn', 'click', async () => { $('probe-btn').disabled = true; try { await capabilities(true); } finally { $('probe-btn').disabled = false; } });
 bind('import-btn', 'click', () => { if (navigationBusy()) return notice('Wait for the current operation to finish.'); $('import-error').textContent = ''; $('import-dialog').showModal(); });
+bind('batch-preview-btn', 'click', previewBatch);
+bind('batch-import-btn', 'click', commitBatch);
+bind('batch-file', 'change', () => { batchPreview = null; $('batch-preview').hidden = true; $('batch-summary').textContent = ''; $('batch-error').textContent = ''; });
 bind('bundle-file', 'change', async () => { if ($('bundle-file').files[0]) $('bundle').value = await $('bundle-file').files[0].text(); });
 bind('import-submit', 'click', async () => {
   if (navigationBusy()) { $('import-error').textContent = 'Wait for the current operation to finish.'; return; }

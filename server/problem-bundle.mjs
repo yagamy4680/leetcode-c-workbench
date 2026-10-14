@@ -34,6 +34,12 @@ export function validateProblemBundle(bundle, { rawBytes, artifact = false } = {
   if (artifact) for (const key of ['overwrite', 'expectedHash']) {
     if (owns(bundle, key)) add('/' + key, 'request-only confirmation field must not be stored in a problem bundle');
   }
+  const similarSlugs = new Set();
+  for (const [index, question] of (bundle.manifest.similarQuestions ?? []).entries()) {
+    if (question.url !== `https://leetcode.com/problems/${question.slug}/`) add(`/manifest/similarQuestions/${index}/url`, 'URL must match the canonical question slug');
+    if (similarSlugs.has(question.slug)) add(`/manifest/similarQuestions/${index}/slug`, 'duplicate similar question');
+    similarSlugs.add(question.slug);
+  }
   const sources = bundle.manifest.sources ?? ['main.c'], headers = bundle.manifest.headers ?? [];
   for (const [key, names] of [['sources', sources], ['headers', headers]]) {
     names.forEach((filename, index) => {

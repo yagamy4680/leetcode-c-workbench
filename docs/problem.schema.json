@@ -68,6 +68,52 @@
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]+\\.h$"
           }
+        },
+        "similarQuestions": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "required": [
+              "title",
+              "slug",
+              "url",
+              "difficulty"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 999999
+              },
+              "frontendId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string",
+                "pattern": "\\S"
+              },
+              "slug": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "url": {
+                "type": "string",
+                "pattern": "^https://leetcode\\.com/problems/[a-z0-9-]+/$"
+              },
+              "difficulty": {
+                "enum": [
+                  "Easy",
+                  "Medium",
+                  "Hard"
+                ]
+              },
+              "isPaidOnly": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": true

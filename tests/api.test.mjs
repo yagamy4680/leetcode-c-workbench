@@ -230,3 +230,64 @@ test('normalized topic tags have unique indexed joins and are refreshed on overw
   const tag=await db.tag.findUnique({where:{name:'Tree'}});
   await assert.rejects(db.problemTag.create({data:{problemId:94,tagId:tag.id}}));
 });
+
+function problemZip(entries) {
+  return execFileSync('python3',['-c',`import io,json,sys,zipfile
+stream=io.BytesIO()
+with zipfile.ZipFile(stream,'w',zipfile.ZIP_DEFLATED) as archive:
+    for filename,data in json.load(sys.stdin): archive.writestr(filename,json.dumps(data))
+sys.stdout.buffer.write(stream.getvalue())`],{input:JSON.stringify(entries),maxBuffer:40*1024*1024});
+}
+async function previewZip(bytes) {
+  return fetch(base+'/api/imports/preview',{method:'POST',headers:{Authorization:auth,'Content-Type':'application/zip'},body:bytes});
+}
+function zipBundle(id) { const bundle=JSON.parse(fs.readFileSync('bundles/problem-94.json','utf8'));bundle.manifest.id=id;return bundle; }
+
+test('ZIP preview validates every bundle before writes and batch commits only once',async()=>{
+  const good=zipBundle(9901),bad=zipBundle(9902);delete bad.files['main.c'];
+  assert.equal((await previewZip(problemZip([['problem-9901.json',good],['problem-9902.json',bad]]))).status,400);
+  assert.equal(fs.existsSync(path.join(data,'problems/9901')),false);
+  good.overwrite=true;
+  assert.equal((await previewZip(problemZip([['problem-9901.json',good]]))).status,400);delete good.overwrite;
+  const preview=await previewZip(problemZip([['problem-9901.json',good],['folder/problem.json',zipBundle(9902)]]));
+  assert.equal(preview.status,200);const job=await preview.json();assert.equal(job.problems.length,2);
+  assert.equal(fs.existsSync(path.join(data,'problems/9901')),false);
+  const body={token:job.token,items:job.problems.map(problem=>({id:problem.id,action:'import'}))};
+  const result=await request('/api/imports/commit','POST',body);assert.equal(result.status,200);
+  assert.deepEqual((await result.json()).results.map(item=>item.status),['imported','imported']);
+  assert.equal((await request('/api/imports/commit','POST',body)).status,410);
+  assert.equal(await db.problem.count({where:{id:{in:[9901,9902]}}}),2);
+});
+test('ZIP duplicate choices require confirmation, preserve accepted and reject stale previews',async()=>{
+  await request('/api/problems/94','PATCH',{accepted:true});
+  const zip=problemZip([['problem-94.json',zipBundle(94)],['problem-9903.json',zipBundle(9903)],['_collection.json',{included:[94,9903],unavailable:[{slug:'premium-fixture',reason:'Official C starter unavailable'}],complete:false}]]);
+  let job=await(await previewZip(zip)).json();assert.equal(job.problems[0].existing,true);
+  assert.equal(job.collectionReport.unavailable.length,1);
+  const choices=[{id:94,action:'overwrite'},{id:9903,action:'import'}];
+  assert.equal((await request('/api/imports/commit','POST',{token:job.token,items:choices})).status,428);
+  const oldFile=path.join(data,'problems/94/solution-master.c');fs.writeFileSync(oldFile,'/* changed after preview */');
+  assert.equal((await request('/api/imports/commit','POST',{token:job.token,items:choices,confirmedOverwrite:true})).status,409);
+  assert.equal(fs.existsSync(path.join(data,'problems/9903')),false);
+  job=await(await previewZip(zip)).json();
+  const result=await(await request('/api/imports/commit','POST',{token:job.token,items:choices,confirmedOverwrite:true})).json();
+  assert.equal(result.results[0].overwritten,true);assert.equal(result.results[1].status,'imported');
+  assert.equal(fs.readFileSync(path.join(data,result.results[0].backupPath,'solution-master.c'),'utf8'),'/* changed after preview */');
+  assert.equal((await db.problem.findUnique({where:{id:94}})).accepted,true);
+  job=await(await previewZip(zip)).json();
+  const skipped=await(await request('/api/imports/commit','POST',{token:job.token,items:job.problems.map(problem=>({id:problem.id,action:'skip'}))})).json();
+  assert.ok(skipped.results.every(item=>item.status==='skipped'));
+});
+test('batch expiration, active runs and partial filesystem failures have explicit outcomes',async()=>{
+  const {createBatchImports}=await import('../server/batch-import.mjs');const active=new Set();
+  const service=createBatchImports({python:'python3',active,syncProblem:async()=>{}});
+  const zip=problemZip([['problem-9904.json',zipBundle(9904)],['problem-9905.json',zipBundle(9905)]]);
+  try {
+    let job=await service.preview(zip);const originalNow=Date.now;
+    try {Date.now=()=>originalNow()+11*60*1000;await assert.rejects(service.commit({token:job.token}),error=>error.status===410);}finally{Date.now=originalNow;}
+    job=await service.preview(zip);const items=job.problems.map(problem=>({id:problem.id,action:'import'}));
+    active.add('9904/master');await assert.rejects(service.commit({token:job.token,items}),error=>error.status===409);active.clear();
+    const rename=fs.renameSync;let result;
+    try {fs.renameSync=(from,to)=>{if(to===path.join(data,'problems/9905'))throw new Error('Simulated batch installation failure');return rename(from,to);};result=await service.commit({token:job.token,items});}finally{fs.renameSync=rename;}
+    assert.deepEqual(result.results.map(item=>item.status),['imported','failed']);assert.equal(fs.existsSync(path.join(data,'problems/9904')),true);assert.equal(fs.existsSync(path.join(data,'problems/9905')),false);
+  } finally {service.close();}
+});

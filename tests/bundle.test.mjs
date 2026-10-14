@@ -48,3 +48,13 @@ test('CLI validates stdin offline, returns structured errors and distinct exit c
   try { const missing = spawnSync(process.execPath, ['scripts/validate-problem.mjs', path.join(temp, 'missing.json')]); assert.equal(missing.status, 2); }
   finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
+
+test('Similar Questions validates canonical links, optional IDs and duplicate slugs',()=>{
+  const bundle=example();assert.ok(bundle.manifest.similarQuestions.length);
+  assert.deepEqual(validateProblemBundle(bundle),[]);
+  const first=bundle.manifest.similarQuestions[0];
+  first.url='https://leetcode.com/problems/wrong-slug/';assert.ok(validateProblemBundle(bundle).length);
+  first.url=`https://leetcode.com/problems/${first.slug}/`;
+  delete first.id;assert.deepEqual(validateProblemBundle(bundle),[]);
+  bundle.manifest.similarQuestions.push({...first});assert.ok(validateProblemBundle(bundle).some(error=>/duplicate/.test(error.message)));
+});

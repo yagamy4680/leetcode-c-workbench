@@ -14,5 +14,88 @@
     "main.c"
   ],
   "headers": [],
-  "signature": "int* inorderTraversal(struct TreeNode* root, int* returnSize);"
+  "signature": "int* inorderTraversal(struct TreeNode* root, int* returnSize);",
+  "similarQuestions": [
+    {
+      "title": "Validate Binary Search Tree",
+      "slug": "validate-binary-search-tree",
+      "difficulty": "Medium",
+      "url": "https://leetcode.com/problems/validate-binary-search-tree/",
+      "frontendId": "98",
+      "id": 98,
+      "isPaidOnly": false
+    },
+    {
+      "title": "Binary Tree Preorder Traversal",
+      "slug": "binary-tree-preorder-traversal",
+      "difficulty": "Easy",
+      "url": "https://leetcode.com/problems/binary-tree-preorder-traversal/",
+      "frontendId": "144",
+      "id": 144,
+      "isPaidOnly": false
+    },
+    {
+      "title": "Binary Tree Postorder Traversal",
+      "slug": "binary-tree-postorder-traversal",
+      "difficulty": "Easy",
+      "url": "https://leetcode.com/problems/binary-tree-postorder-traversal/",
+      "frontendId": "145",
+      "id": 145,
+      "isPaidOnly": false
+    },
+    {
+      "title": "Binary Search Tree Iterator",
+      "slug": "binary-search-tree-iterator",
+      "difficulty": "Medium",
+      "url": "https://leetcode.com/problems/binary-search-tree-iterator/",
+      "frontendId": "173",
+      "id": 173,
+      "isPaidOnly": false
+    },
+    {
+      "title": "Kth Smallest Element in a BST",
+      "slug": "kth-smallest-element-in-a-bst",
+      "difficulty": "Medium",
+      "url": "https://leetcode.com/problems/kth-smallest-element-in-a-bst/",
+      "frontendId": "230",
+      "id": 230,
+      "isPaidOnly": false
+    },
+    {
+      "title": "Closest Binary Search Tree Value II",
+      "slug": "closest-binary-search-tree-value-ii",
+      "difficulty": "Hard",
+      "url": "https://leetcode.com/problems/closest-binary-search-tree-value-ii/",
+      "frontendId": "272",
+      "id": 272,
+      "isPaidOnly": true
+    },
+    {
+      "title": "Inorder Successor in BST",
+      "slug": "inorder-successor-in-bst",
+      "difficulty": "Medium",
+      "url": "https://leetcode.com/problems/inorder-successor-in-bst/",
+      "frontendId": "285",
+      "id": 285,
+      "isPaidOnly": true
+    },
+    {
+      "title": "Convert Binary Search Tree to Sorted Doubly Linked List",
+      "slug": "convert-binary-search-tree-to-sorted-doubly-linked-list",
+      "difficulty": "Medium",
+      "url": "https://leetcode.com/problems/convert-binary-search-tree-to-sorted-doubly-linked-list/",
+      "frontendId": "426",
+      "id": 426,
+      "isPaidOnly": true
+    },
+    {
+      "title": "Minimum Distance Between BST Nodes",
+      "slug": "minimum-distance-between-bst-nodes",
+      "difficulty": "Easy",
+      "url": "https://leetcode.com/problems/minimum-distance-between-bst-nodes/",
+      "frontendId": "783",
+      "id": 783,
+      "isPaidOnly": false
+    }
+  ]
 }

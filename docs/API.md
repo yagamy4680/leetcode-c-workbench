@@ -10,6 +10,8 @@ All endpoints require HTTP Basic Auth, including static files. Use HTTPS at `lee
 | GET | `/api/tags` | Active topic tags and problem counts |
 | PATCH | `/api/problems/:id` | Set manual problem-level `{accepted: true/false}` |
 | POST | `/api/problems` | New problem import or explicitly confirmed replacement |
+| POST | `/api/imports/preview` | Validate a raw ZIP and preview new/existing problem IDs |
+| POST | `/api/imports/commit` | Commit explicit import/skip/overwrite choices for a preview |
 | GET | `/api/problems/:id` | Metadata, markdown, tests/hash, recent history |
 | GET | `/api/problems/:id/solutions/:name` | Code and hash |
 | GET | `/api/problems/:id/solutions/:name/events` | SSE current hash and disk-change notifications |
@@ -26,6 +28,13 @@ All endpoints require HTTP Basic Auth, including static files. Use HTTPS at `lee
 | PATCH | `/api/submissions/:id` | Record `{result, memo}`; pending/success/fail |
 
 Source and test updates without expectedHash return 428; stale hashes return 409. Import filenames are basenames ending in `.c` or `.h`; path traversal and symlinks are rejected. JSON request limit is 12 MiB; individual source limit is 1 MiB. Browser cross-site mutation requests are blocked.
+
+ZIP preview accepts a raw archive up to 32 MiB rather than JSON or multipart.
+See [problem-collections.md](problem-collections.md) for the complete archive,
+preview token, overwrite confirmation, expiration, and partial-result contract.
+It uses the same authentication, origin checks, and bundle validator as single
+imports. Preview never writes problem files. Commit can import multiple IDs,
+with atomic replacement and backups per problem.
 
 ## Problem bundle
 

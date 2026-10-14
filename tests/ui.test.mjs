@@ -30,7 +30,7 @@ async function harness(handler=()=>undefined) {
   w.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
   w.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
   w.fetch=async(route,opts={})=>{
-    const call={route,method:opts.method||'GET',body:opts.body?JSON.parse(opts.body):null};calls.push(call);
+    const call={route,method:opts.method||'GET',body:typeof opts.body==='string'?JSON.parse(opts.body):(opts.body||null)};calls.push(call);
     const custom=handler(call);if(custom!==undefined)return await custom;
     if(route==='/api/problems')return response([problem()]);
     if(route==='/api/tags')return response([]);
@@ -39,7 +39,7 @@ async function harness(handler=()=>undefined) {
     throw new Error(`Unexpected request ${call.method} ${route}`);
   };
   w.eval(fs.readFileSync('web/test-case.js','utf8'));
-  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode,refreshExternalCode,openCaseForm,addPastedCase,refresh,saveAcceptance,renderProblems};');
+  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode,refreshExternalCode,openCaseForm,addPastedCase,refresh,saveAcceptance,renderProblems,previewBatch,commitBatch};');
   await pause();await w.hooks.loadProblem(1480);
   return {w,calls,$:id=>w.document.getElementById(id),close:()=>w.close()};
 }
@@ -280,4 +280,30 @@ test('a slow search cannot overwrite a newer result',async()=>{
   h.$('search').value='old';const first=h.w.hooks.refresh();h.$('search').value='new';await h.w.hooks.refresh();
   ack.resolve(response([problem(94)]));await first;
   assert.equal(h.w.hooks.state.problems[0].id,589);h.close();
+});
+
+test('Similar Questions are shown as official links with optional premium information',async()=>{
+  const similarQuestions=[{id:144,title:'Binary Tree Preorder Traversal',slug:'binary-tree-preorder-traversal',url:'https://leetcode.com/problems/binary-tree-preorder-traversal/',difficulty:'Easy',isPaidOnly:true}];
+  const h=await harness(call=>call.route==='/api/problems/94'?response(problem(94,{manifest:{topics:[],similarQuestions}})):undefined);
+  await h.w.hooks.loadProblem(94);assert.equal(h.$('similar-questions').hidden,false);
+  assert.match(h.$('similar-list').textContent,/144.*Preorder.*Premium/);assert.equal(h.$('similar-list').querySelector('a').hostname,'leetcode.com');h.close();
+});
+test('ZIP preview defaults duplicates to skip and batch import preserves editor drafts',async()=>{
+  let committed;const h=await harness(call=>call.route==='/api/imports/preview'?response({token:'zip-token',problems:[{id:94,title:'Existing',existing:true},{id:144,title:'New',existing:false}],collectionReport:{unavailable:[{slug:'blocked',reason:'No official starter'}]}}):call.route==='/api/imports/commit'?(committed=call.body,response({results:[{id:94,status:'skipped'},{id:144,status:'imported'}]})):undefined);
+  Object.defineProperty(h.$('batch-file'),'files',{value:[new h.w.File(['fixture'],'problems.zip',{type:'application/zip'})]});
+  h.$('code').value='unsaved C';await h.w.hooks.previewBatch();
+  assert.equal(h.$('batch-items').querySelector('[data-batch-id="94"]').value,'skip');
+  assert.match(h.$('batch-unavailable').textContent,/blocked/);
+  await h.w.hooks.commitBatch();assert.deepEqual(committed.items,[{id:94,action:'skip'},{id:144,action:'import'}]);
+  assert.equal(h.$('code').value,'unsaved C');assert.match(h.$('batch-summary').textContent,/1 imported/);h.close();
+});
+test('cancelling ZIP overwrite sends no commit and failed preview restores controls',async()=>{
+  const h=await harness(call=>call.route==='/api/imports/preview'?response({token:'zip-token',problems:[{id:94,title:'Existing',existing:true}]}):undefined);
+  Object.defineProperty(h.$('batch-file'),'files',{value:[new h.w.File(['fixture'],'problems.zip')]});
+  await h.w.hooks.previewBatch();h.$('batch-items').querySelector('select').value='overwrite';h.w.confirm=()=>false;await h.w.hooks.commitBatch();
+  assert.equal(h.calls.filter(call=>call.route==='/api/imports/commit').length,0);
+  assert.equal(h.$('batch-import-btn').disabled,false);h.close();
+  const failure=await harness(call=>call.route==='/api/imports/preview'?new Response(JSON.stringify({error:'Invalid ZIP'}),{status:400}):undefined);
+  Object.defineProperty(failure.$('batch-file'),'files',{value:[new failure.w.File(['invalid'],'problems.zip')]});await failure.w.hooks.previewBatch();
+  assert.match(failure.$('batch-error').textContent,/Invalid ZIP/);assert.equal(failure.$('batch-file').disabled,false);assert.equal(failure.w.hooks.state.preparing,false);failure.close();
 });

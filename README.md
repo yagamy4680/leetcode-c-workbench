@@ -89,6 +89,36 @@ node scripts/validate-problem.mjs bundles/problem-94.json
 npm run validate:problem -- --json bundles/problem-94.json
 ```
 
+Bundles can include official related-problem links in `manifest.similarQuestions`.
+The Description tab displays them, including difficulty and a premium marker
+when supplied. Older bundles remain valid; existing workspace metadata is not
+automatically replaced when the application is updated.
+
+For a collection, follow
+[skills/fetch-similar-leetcode-problems/SKILL.md](skills/fetch-similar-leetcode-problems/SKILL.md).
+For example, ask your agent:
+
+> Follow skills/fetch-similar-leetcode-problems/SKILL.md in this repository.
+> Fetch the direct official Similar Questions for
+> https://leetcode.com/problems/binary-tree-preorder-traversal/.
+> Keep TODO solutions and official Markdown images, validate and compile/test
+> each framework, and deliver independent problem-<id>.json files in a ZIP.
+> Report unavailable questions and verification limits.
+
+The seed is excluded unless requested. Restricted or unsupported questions are
+reported rather than replaced with incomplete bundles. In **Import problem →
+Batch import a ZIP**, choose the archive and click **Preview ZIP**. All files
+are validated before any writes. New IDs default to Import; existing IDs default
+to Skip. Choose Overwrite only for intended replacements and confirm **Import
+selected**. Previous files are backed up; accepted marks and history remain.
+The result lists each imported, skipped, or failed problem. A batch may partially
+succeed; it is not a transaction across all problems. Finish CLI runs first.
+
+See [docs/problem-collections.md](docs/problem-collections.md) for archive limits,
+completeness reports, packaging commands, and the preview/commit API. Check a
+ZIP offline with `npm run validate:zip -- collection.zip`. Updating the server
+requires `git pull`, `npm ci`, and a restart; no database reset is needed.
+
 In the web interface, open **Tests → Add case** to paste LeetCode's input and
 expected output. Paste a single array/integer/string or named inputs such as
 `root = [1,null,2]`; multiple fields can be a JSON object or one assignment per
