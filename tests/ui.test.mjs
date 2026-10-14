@@ -33,12 +33,13 @@ async function harness(handler=()=>undefined) {
     const call={route,method:opts.method||'GET',body:opts.body?JSON.parse(opts.body):null};calls.push(call);
     const custom=handler(call);if(custom!==undefined)return await custom;
     if(route==='/api/problems')return response([problem()]);
+    if(route==='/api/tags')return response([]);
     const match=/^\/api\/problems\/(\d+)$/.exec(route);if(match)return response(problem(Number(match[1])));
     if(route.endsWith('/solutions/master'))return response({code:'initial',hash:'source-hash'});
     throw new Error(`Unexpected request ${call.method} ${route}`);
   };
   w.eval(fs.readFileSync('web/test-case.js','utf8'));
-  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode,refreshExternalCode,openCaseForm,addPastedCase};');
+  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode,refreshExternalCode,openCaseForm,addPastedCase,refresh,saveAcceptance,renderProblems};');
   await pause();await w.hooks.loadProblem(1480);
   return {w,calls,$:id=>w.document.getElementById(id),close:()=>w.close()};
 }
@@ -246,4 +247,37 @@ test('adding a testcase locks bulk saves and preserves newer editor changes duri
   h.$('tests-json').value='newer editor draft';ack.resolve(response({hash:'new-tests'}));await pending;
   assert.equal(h.$('tests-json').value,'newer editor draft');assert.equal(h.w.hooks.testsDirty(),true);
   assert.equal(h.$('save-tests').disabled,false);h.close();
+});
+
+test('sidebar distinguishes passed runs and LeetCode accepted status',async()=>{
+  const h=await harness(call=>call.route==='/api/problems'?response([problem(94,{accepted:true,runs:[{status:'passed'}]})]):undefined);
+  const style=h.w.document.createElement('style');style.textContent=fs.readFileSync('web/style.css','utf8');h.w.document.head.append(style);
+  const item=h.$('problems').querySelector('[data-problem="94"]');
+  assert.equal(item.querySelector('.status-passed').textContent,'passed');
+  assert.equal(h.w.getComputedStyle(item.querySelector('.status-passed')).color,'rgb(23, 99, 68)');
+  assert.equal(item.querySelector('.accepted-label').textContent,'Accepted');h.close();
+});
+test('accepted checkbox saves without disturbing unsaved code and reverts when rejected',async()=>{
+  let reject=false;const h=await harness(call=>call.method==='PATCH'?reject?new Response(JSON.stringify({error:'Save unavailable'}),{status:500}):response({id:1480,accepted:call.body.accepted}):undefined);
+  h.$('code').value='my unsaved C';h.$('problem-accepted').checked=true;await h.w.hooks.saveAcceptance();
+  assert.equal(h.w.hooks.state.problem.accepted,true);assert.equal(h.$('code').value,'my unsaved C');
+  assert.equal(h.$('problem-accepted').checked,true);
+  reject=true;h.$('problem-accepted').checked=false;await h.w.hooks.saveAcceptance();
+  assert.equal(h.$('problem-accepted').checked,true);assert.match(h.$('notice').textContent,/Save unavailable/);h.close();
+});
+test('multiple tag filters combine with accepted and search and can be cleared',async()=>{
+  const h=await harness(call=>call.route.startsWith('/api/problems?')?response([problem(94,{accepted:true})]):call.route==='/api/tags'?response([{name:'Tree',count:3},{name:'Depth-First Search',count:2}]):undefined);
+  h.w.hooks.state.selectedTags.add('Tree');h.w.hooks.state.selectedTags.add('Depth-First Search');
+  h.$('search').value='94';h.$('accepted-filter').value='true';await h.w.hooks.refresh();
+  const query=new URL(h.calls.filter(call=>call.route.startsWith('/api/problems?')).at(-1).route,'http://test').searchParams;
+  assert.equal(query.get('q'),'94');assert.equal(query.get('accepted'),'true');assert.deepEqual(query.getAll('tags'),['Depth-First Search','Tree']);
+  assert.equal(h.$('tag-options').querySelectorAll('input:checked').length,2);
+  h.$('clear-filters').click();await pause();await pause();
+  assert.equal(h.$('search').value,'');assert.equal(h.w.hooks.state.selectedTags.size,0);assert.equal(h.$('accepted-filter').value,'');h.close();
+});
+test('a slow search cannot overwrite a newer result',async()=>{
+  const ack=deferred();const h=await harness(call=>call.route.includes('?q=old')?ack.promise:call.route.includes('?q=new')?response([problem(589)]):undefined);
+  h.$('search').value='old';const first=h.w.hooks.refresh();h.$('search').value='new';await h.w.hooks.refresh();
+  ack.resolve(response([problem(94)]));await first;
+  assert.equal(h.w.hooks.state.problems[0].id,589);h.close();
 });

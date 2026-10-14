@@ -1,6 +1,6 @@
 /* Plain browser JS; all persistent edits use hashes to protect local changes. */
 const $ = id => document.getElementById(id);
-const state = { problems: [], problem: null, variant: 'master', sourceHash: '', savedCode: '', testsHash: '', savedTests: '', report: null, running: false, preparing: false, loading: false, viewEpoch: 0, savingCode: null, savingTests: null, snapshot: null, live: '', externalConflict: false };
+const state = { problems: [], problem: null, variant: 'master', sourceHash: '', savedCode: '', testsHash: '', savedTests: '', report: null, running: false, preparing: false, loading: false, viewEpoch: 0, savingCode: null, savingTests: null, snapshot: null, live: '', externalConflict: false, tags: [], selectedTags: new Set(), listEpoch: 0, accepting: false };
 const esc = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const label = value => String(value).replaceAll('_', ' ');
 const date = value => new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -39,11 +39,55 @@ function activateTab(tab) {
   if (tab === 'solution') syncEditorScroll();
 }
 function renderProblems() {
-  const query = $('search').value.toLowerCase();
-  const items = state.problems.filter(p => `${p.id} ${p.title}`.toLowerCase().includes(query));
-  $('problems').innerHTML = items.length ? items.map(p => `<button type="button" class="problem-item" data-problem="${p.id}" ${p.id === state.problem?.id ? 'aria-current="page"' : ''}><strong>${p.id}. ${esc(p.title)}</strong><small>${esc(p.difficulty)} · ${p.solutions.length} solution${p.solutions.length === 1 ? '' : 's'}${p.runs[0] ? ` · ${esc(label(p.runs[0].status))}` : ''}</small></button>`).join('') : '<p class="muted">No matching problems. Import a problem to add it.</p>';
+  const items = state.problems;
+  $('problems').innerHTML = items.length ? items.map(p => `<button type="button" class="problem-item" data-problem="${p.id}" ${p.id === state.problem?.id ? 'aria-current="page"' : ''}><strong>${p.id}. ${esc(p.title)}</strong><small>${esc(p.difficulty)} · ${p.solutions.length} solution${p.solutions.length === 1 ? '' : 's'}${p.runs[0] ? ` · <span class="run-status ${p.runs[0].status === 'passed' ? 'status-passed' : 'status-error'}">${esc(label(p.runs[0].status))}</span>` : ''}</small>${p.accepted ? '<span class="accepted-label">Accepted</span>' : ''}</button>`).join('') : '<p class="muted">No matching problems. Change filters or import a problem.</p>';
+  $('filter-status').textContent = `${items.length} problem${items.length === 1 ? '' : 's'}`;
+  $('clear-filters').hidden = !$('search').value && !$('accepted-filter').value && !state.selectedTags.size;
 }
-async function refresh() { state.problems = await json('/api/problems'); renderProblems(); }
+function renderTags() {
+  const focusedTag = $('tag-options').contains(document.activeElement) ? document.activeElement.value : null;
+  const tags = new Map(state.tags.map(tag => [tag.name, tag]));
+  for (const name of state.selectedTags) if (!tags.has(name)) tags.set(name, { name, count: 0 });
+  $('tag-options').innerHTML = '<legend class="visually-hidden">Filter by topics</legend>' + [...tags.values()].sort((a,b) => a.name.localeCompare(b.name)).map(tag => `<label class="tag-option"><input type="checkbox" class="form-check-input" value="${esc(tag.name)}" ${state.selectedTags.has(tag.name) ? 'checked' : ''}><span>${esc(tag.name)}</span><small>${tag.count}</small></label>`).join('');
+  $('tag-filter-summary').textContent = state.selectedTags.size ? `Tags (${state.selectedTags.size} selected)` : 'Tags';
+  if (focusedTag !== null) [...$('tag-options').querySelectorAll('input')].find(input => input.value === focusedTag)?.focus();
+}
+async function refresh() {
+  const epoch = ++state.listEpoch, params = new URLSearchParams();
+  if ($('search').value.trim()) params.set('q', $('search').value.trim());
+  if ($('accepted-filter').value) params.set('accepted', $('accepted-filter').value);
+  for (const tag of [...state.selectedTags].sort()) params.append('tags', tag);
+  const query = params.toString();
+  try {
+    const [problems, tags] = await Promise.all([json('/api/problems' + (query ? '?' + query : '')), json('/api/tags')]);
+    if (epoch !== state.listEpoch) return;
+    state.problems = problems; state.tags = tags; renderTags(); renderProblems();
+  } catch (error) { if (epoch === state.listEpoch) throw error; }
+}
+let filterTimer;
+function filterProblems() {
+  ++state.listEpoch; clearTimeout(filterTimer);
+  $('filter-status').textContent = 'Searching…';
+  filterTimer = setTimeout(() => refresh().catch(error => { $('filter-status').textContent = 'Search failed. Use Refresh to try again.'; notice(error.message, true); }), 180);
+}
+function renderAcceptance() {
+  $('problem-accepted').checked = Boolean(state.problem?.accepted);
+  $('problem-accepted').disabled = state.accepting;
+}
+async function saveAcceptance() {
+  if (!state.problem || state.accepting) return;
+  const id = state.problem.id, accepted = $('problem-accepted').checked;
+  state.accepting = true; $('problem-accepted').disabled = true;
+  try {
+    const result = await json(`/api/problems/${id}`, 'PATCH', { accepted });
+    if (state.problem.id === id) state.problem.accepted = result.accepted;
+    const item = state.problems.find(problem => problem.id === id); if (item) item.accepted = result.accepted;
+    renderProblems();
+    notice(result.accepted ? 'Problem marked accepted on LeetCode.' : 'Accepted mark cleared.');
+    try { await refresh(); } catch { notice('Accepted status saved. Refresh the problem list to update its filters.', true); }
+  } catch (error) { notice(error.message, true); }
+  finally { state.accepting = false; renderAcceptance(); }
+}
 function applyCode(result, variant) {
   state.externalConflict = false;
   state.variant = variant; state.sourceHash = result.hash; state.savedCode = result.code;
@@ -118,7 +162,7 @@ async function loadProblem(id, keepTab = false, discardConfirmed = false) {
   const code = await json(`/api/problems/${id}/solutions/${encodeURIComponent(variant)}`);
   if (epoch !== state.viewEpoch) return;
   // Commit the identity and editor together only after both requests succeed.
-  state.problem = p;
+  state.problem = p; renderAcceptance();
   $('case-form').hidden = true; $('case-input').value = ''; $('case-expected').value = '';
   $('problem').hidden = false; $('empty').hidden = true; $('problem-title').textContent = `${p.id}. ${p.title}`;
   $('problem-meta').textContent = `${p.difficulty} · ${p.manifest.topics.join(' · ')}`;
@@ -290,7 +334,11 @@ async function capabilities(refresh = false) {
   $('capabilities').innerHTML = [['ASan', info.addressSanitizer], ['UBSan', info.undefinedSanitizer], ['Leak check', info.leakSanitizer]].map(([title, available]) => `<span class="check-state">${title}: <strong>${available ? 'available' : 'unavailable'}</strong></span>`).join('');
   $('compiler-version').textContent = info.version + (!info.leakSanitizer && info.leakProbeLog ? '\n\nLeak probe:\n' + info.leakProbeLog : '');
 }
-bind('search', 'input', renderProblems);
+bind('search', 'input', filterProblems);
+bind('accepted-filter', 'change', filterProblems);
+bind('problem-accepted', 'change', saveAcceptance);
+bind('tag-options', 'change', event => { const input = event.target; if (input.type !== 'checkbox') return; if (input.checked) state.selectedTags.add(input.value); else state.selectedTags.delete(input.value); $('tag-filter-summary').textContent = state.selectedTags.size ? `Tags (${state.selectedTags.size} selected)` : 'Tags'; filterProblems(); });
+bind('clear-filters', 'click', async () => { clearTimeout(filterTimer); $('search').value = ''; $('accepted-filter').value = ''; state.selectedTags.clear(); await refresh(); $('search').focus(); });
 bind('refresh-btn', 'click', async () => { await refresh(); notice('Problem list refreshed.'); });
 bind('code', 'input', lines);
 bind('code', 'scroll', syncEditorScroll);

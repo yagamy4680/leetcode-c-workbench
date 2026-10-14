@@ -13,11 +13,14 @@ model Problem {
   slug        String
   difficulty  String
   topics      String
+  accepted    Boolean  @default(false)
+  tags        ProblemTag[]
   url         String
   updatedAt   DateTime @updatedAt
   solutions   Solution[]
   runs        Run[]
   submissions Submission[]
+  @@index([accepted, id])
 }
 
 model Solution {
@@ -58,4 +61,19 @@ model Submission {
   updatedAt   DateTime @updatedAt
   problem     Problem  @relation(fields: [problemId], references: [id])
   run         Run?     @relation(fields: [runId], references: [id])
+}
+
+model Tag {
+  id       Int          @id @default(autoincrement())
+  name     String       @unique
+  problems ProblemTag[]
+}
+
+model ProblemTag {
+  problemId Int
+  tagId     Int
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  @@id([problemId, tagId])
+  @@index([tagId, problemId])
 }

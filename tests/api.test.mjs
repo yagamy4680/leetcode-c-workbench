@@ -31,6 +31,7 @@ after(async()=>{if(server){server.closeAllConnections();await new Promise(resolv
 test('all application endpoints require authentication',async()=>{
   assert.equal((await fetch(base+'/api/problems')).status,401);
   assert.equal((await fetch(base+'/')).status,401);
+  assert.equal((await fetch(base+'/api/tags')).status,401);
   assert.equal((await fetch(base+'/api/problems/1480/solutions/master/events')).status,401);
   assert.equal((await request('/api/health')).status,200);
   for(const file of ['/','/app.js','/style.css','/utilities.css','/vendor/bootstrap.css','/vendor/marked.js','/vendor/purify.js','/vendor/prism-core.js','/vendor/prism-clike.js','/vendor/prism-c.js']) assert.equal((await request(file)).status,200,file);
@@ -187,4 +188,45 @@ test('appending a testcase validates it and preserves every previous case with C
   assert.equal(tests.at(-1).input.root.length,5001);
   assert.equal((await request('/api/problems/94/tests','POST',{test:testCase,expectedHash:ack.hash})).status,400);
   assert.deepEqual(JSON.parse(fs.readFileSync(dir,'utf8')),tests);
+});
+
+test('accepted status is manual, persistent across indexing, and filterable with tags and search',async()=>{
+  assert.equal((await request('/api/problems/94','PATCH',{accepted:'true'})).status,400);
+  assert.equal((await request('/api/problems/94','PATCH',{accepted:true},{Origin:'https://other.example'})).status,403);
+  assert.equal((await request('/api/problems/94','PATCH',{accepted:true})).status,200);
+  const current=await(await request('/api/problems/94')).json();assert.equal(current.accepted,true);
+  const filtered=await(await request('/api/problems?q=94&accepted=true&tags=Tree&tags=Stack')).json();
+  assert.deepEqual(filtered.map(p=>p.id),[94]);assert.ok(filtered[0].tags.some(t=>t.name==='Tree'));
+  const none=await(await request('/api/problems?q=94&accepted=false')).json();assert.deepEqual(none,[]);
+  const treeStack=await(await request('/api/problems?tags=Tree&tags=Stack')).json();
+  assert.ok(treeStack.some(p=>p.id===94));assert.ok(!treeStack.some(p=>p.id===783));
+  assert.ok(treeStack.every(p=>['Tree','Stack'].every(name=>p.tags.some(tag=>tag.name===name))));
+  assert.deepEqual(await(await request('/api/problems?tags=unknown-topic')).json(),[]);
+  assert.equal((await request('/api/problems?accepted=yes')).status,400);
+  assert.equal((await request('/api/problems?tags=')).status,400);
+  assert.equal((await request('/api/problems?q=a&q=b')).status,400);
+  assert.equal((await request('/api/problems/94','PATCH',{accepted:false})).status,200);
+  assert.equal((await(await request('/api/problems/94')).json()).accepted,false);
+});
+test('normalized topic tags have unique indexed joins and are refreshed on overwrite without clearing accepted',async()=>{
+  const bundle=JSON.parse(fs.readFileSync('bundles/problem-94.json','utf8'));bundle.manifest.id=996;
+  bundle.manifest.topics=['Tree',' Tree ','Stack','','Tree'];
+  assert.equal((await request('/api/problems','POST',bundle)).status,201);
+  let problem=await(await request('/api/problems/996')).json();
+  assert.deepEqual(problem.tags.map(tag=>tag.name).sort(),['Stack','Tree']);
+  assert.equal(await db.problemTag.count({where:{problemId:996}}),2);
+  await request('/api/problems/996','PATCH',{accepted:true});
+  bundle.manifest.topics=['New Topic'];
+  const conflict=await(await request('/api/problems','POST',bundle)).json();
+  assert.equal((await request('/api/problems','POST',{...bundle,overwrite:true,expectedHash:conflict.expectedHash})).status,200);
+  problem=await(await request('/api/problems/996')).json();assert.equal(problem.accepted,true);
+  assert.deepEqual(problem.tags.map(tag=>tag.name),['New Topic']);
+  assert.deepEqual(await(await request('/api/problems?q=996&tags=Tree')).json(),[]);
+  const tags=await(await request('/api/tags')).json();
+  assert.ok(tags.find(tag=>tag.name==='New Topic'&&tag.count===1));assert.equal(tags.filter(tag=>tag.name==='Tree').length,1);
+  const indexes=await db.$queryRawUnsafe('PRAGMA index_list("ProblemTag")');
+  assert.ok(indexes.some(index=>index.name==='ProblemTag_tagId_problemId_idx'));
+  assert.ok((await db.$queryRawUnsafe('PRAGMA index_list("Problem")')).some(index=>index.name==='Problem_accepted_id_idx'));
+  const tag=await db.tag.findUnique({where:{name:'Tree'}});
+  await assert.rejects(db.problemTag.create({data:{problemId:94,tagId:tag.id}}));
 });

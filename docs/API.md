@@ -6,7 +6,9 @@ All endpoints require HTTP Basic Auth, including static files. Use HTTPS at `lee
 |---|---|---|
 | GET | `/api/health` | Authenticated health check |
 | GET | `/api/doctor` | Compiler and sanitizer probe; `?refresh=1` repeats it |
-| GET | `/api/problems` | Indexed problems, solutions, latest run |
+| GET | `/api/problems` | Filtered problems, accepted status, normalized tags, solutions, latest run |
+| GET | `/api/tags` | Active topic tags and problem counts |
+| PATCH | `/api/problems/:id` | Set manual problem-level `{accepted: true/false}` |
 | POST | `/api/problems` | New problem import or explicitly confirmed replacement |
 | GET | `/api/problems/:id` | Metadata, markdown, tests/hash, recent history |
 | GET | `/api/problems/:id/solutions/:name` | Code and hash |
@@ -134,3 +136,36 @@ PUT updates and problem imports. The browser's **Tests → Add case** form sends
 only the new case, infers container/value types from saved examples, and keeps
 pasted data on errors. Input inference is guidance, not a problem-specific C
 input schema or a correctness check.
+
+## Problem search, accepted status, and tags
+
+`GET /api/problems` accepts optional `q`, `accepted`, and repeated `tags` query
+parameters. `q` matches title text or an exact numeric ID. `accepted` must be
+`true` or `false`; omitting it includes both. Tag names are trimmed, case-sensitive
+canonical names; every selected tag must match (AND). Unknown tags match no
+problems. Search and accepted filters combine with the tag filters.
+
+```text
+/api/problems?q=tree&accepted=false&tags=Tree&tags=Depth-First%20Search
+```
+
+Search strings are limited to 200 characters. Up to 100 nonempty tag names of
+128 characters each can be provided. Invalid query types/values return 400.
+List and detail responses contain `accepted` and a flat `tags: [{id, name}]`
+array. The legacy serialized `topics` field is retained. `GET /api/tags` returns
+`[{id, name, count}]`, sorted by name, for tags linked to at least one indexed
+problem; counts are global rather than limited by the active search.
+
+`PATCH /api/problems/:id` requires `{accepted: boolean}` and returns `{id,
+accepted}`. It uses the normal Basic Auth and cross-origin write protections.
+This is user-owned SQLite metadata: indexing and overwrite imports preserve it.
+Local run outcomes and submission outcomes do not automatically set it. Repeated
+manual changes use the last successful update. Clearing the mark does not delete
+history. Problem imports cannot assign accepted status from bundle metadata.
+
+The explicit `Tag`/`ProblemTag` tables enforce unique topic names and unique
+problem/tag pairs. `ProblemTag(tagId, problemId)` and `Problem(accepted, id)`
+indexes support filtering. On startup, recognized legacy workbench databases
+receive an additive, transactional upgrade and topic backfill. Personal sources
+and histories are not rewritten; unrelated or incomplete schemas still fail
+startup rather than being reset.

@@ -120,3 +120,20 @@ dialog[open] { animation: dialog-in 150ms cubic-bezier(.16, 1, .3, 1); }
 .case-form p { overflow-wrap: anywhere; margin-block: 6px 10px; }
 .case-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 @media (max-width: 600px) { .case-form input, .case-form .case-paste { font-size: 16px; } }
+
+.problem-filters { margin-top: 14px; }
+.problem-filters > label { display: block; font-size: 13px; margin-bottom: 5px; }
+#tag-filters { margin-top: 14px; }
+#tag-filters summary { cursor: pointer; font-weight: 600; }
+.filter-hint { font-size: 12px; margin-block: 8px; }
+#tag-options { min-width: 0; max-height: 230px; overflow-y: auto; }
+.tag-option { display: flex; align-items: flex-start; gap: 8px; padding: 6px 2px; font-size: 13px; cursor: pointer; }
+.tag-option span { overflow-wrap: anywhere; }
+.tag-option input { flex-shrink: 0; }
+.tag-option small { margin-inline-start: auto; padding-inline-start: 6px; color: var(--muted); }
+.problem-item .run-status { font-weight: 700; }
+.accepted-label { display: inline-block; margin-top: 5px; font-size: 12px; font-weight: 700; color: #194984; }
+.problem-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
+.accepted-control { display: inline-flex; align-items: center; gap: 8px; color: #194984; font-size: 13px; white-space: nowrap; }
+.accepted-control input { margin-top: 0; }
+@media (max-width: 700px) { .problem-actions { justify-content: flex-start; } }

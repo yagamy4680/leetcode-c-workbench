@@ -23,9 +23,35 @@ export function initializeDatabase() {
   fs.mkdirSync(dataDir, { recursive: true });
   execFileSync(python, [path.join(appDir, 'runner/workbench.py'), 'init'], { stdio: 'inherit', env: process.env });
   createSQLiteFile();
-  // Existing databases are updated only by explicit setup. Never reset or
-  // automatically accept destructive schema changes.
+  // Setup synchronizes the declared schema without resets. Startup separately
+  // applies reviewed additive upgrades; destructive changes are never accepted automatically.
   execFileSync(process.execPath, [path.join(appDir, 'node_modules/prisma/build/index.js'), 'db', 'push', '--skip-generate'], { cwd: appDir, stdio: 'inherit', env: { ...process.env, DATABASE_URL: databaseUrl } });
+}
+
+async function upgradeProblemTracking(db) {
+  const columns = await db.$queryRawUnsafe('PRAGMA table_info("Problem")');
+  const columnNames = columns.map(column => column.name);
+  const legacyColumns = ['id', 'title', 'slug', 'difficulty', 'topics', 'url', 'updatedAt'];
+  if (legacyColumns.some(column => !columnNames.includes(column))) throw new Error('Unrecognized Problem schema. Check DATABASE_URL before running setup.');
+  const statements = fs.readFileSync(path.join(appDir, 'prisma/updates/20261014-accepted-tags.sql'), 'utf8')
+    .replace(/^--.*$/gm, '').split(';').map(sql => sql.trim()).filter(Boolean);
+  // Apply only additive, idempotent changes to the recognized workbench schema.
+  await db.$transaction(async tx => {
+    for (const sql of statements) {
+      if (columnNames.includes('accepted') && sql.startsWith('ALTER TABLE')) continue;
+      await tx.$executeRawUnsafe(sql);
+    }
+    const problems = await tx.$queryRawUnsafe('SELECT id, topics FROM "Problem"');
+    for (const problem of problems) {
+      let topics;
+      try { topics = JSON.parse(problem.topics); } catch { continue; }
+      if (!Array.isArray(topics)) continue;
+      for (const topic of [...new Set(topics.filter(topic => typeof topic === 'string').map(topic => topic.trim()).filter(Boolean))]) {
+        const tag = await tx.tag.upsert({ where: { name: topic }, create: { name: topic }, update: {} });
+        await tx.problemTag.upsert({ where: { problemId_tagId: { problemId: problem.id, tagId: tag.id } }, create: { problemId: problem.id, tagId: tag.id }, update: {} });
+      }
+    }
+  }, { timeout: 30000 });
 }
 
 export async function ensureDatabase(db) {
@@ -41,4 +67,5 @@ export async function ensureDatabase(db) {
   if (missing.length) {
     throw new Error(`SQLite schema is incomplete at ${databaseFile}. Missing tables: ${missing.join(', ')}. Check WB_DATA_DIR/DATABASE_URL, then run npm run setup before starting the service.`);
   }
+  await upgradeProblemTracking(db);
 }

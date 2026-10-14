@@ -35,6 +35,26 @@ function runCommand(args) {
   });
 }
 
+const problemRelations = { solutions: true, tags: { include: { tag: true } }, runs: { orderBy: { startedAt: 'desc' }, take: 1 } };
+const problemView = problem => ({ ...problem, tags: problem.tags.map(relation => relation.tag) });
+function problemFilters(query) {
+  const where = {}, q = query.q ?? '', accepted = query.accepted;
+  if (typeof q !== 'string' || q.length > 200) throw new HttpError(400, 'Search must be a string of at most 200 characters.');
+  if (q.trim()) {
+    where.OR = [{ title: { contains: q.trim() } }];
+    if (/^\d+$/.test(q.trim()) && Number(q) <= 999999) where.OR.push({ id: Number(q) });
+  }
+  if (accepted !== undefined) {
+    if (!['true', 'false'].includes(accepted)) throw new HttpError(400, 'accepted must be true or false.');
+    where.accepted = accepted === 'true';
+  }
+  const rawTags = query.tags === undefined ? [] : (Array.isArray(query.tags) ? query.tags : [query.tags]);
+  if (rawTags.length > 100 || rawTags.some(tag => typeof tag !== 'string' || !tag.trim() || tag.length > 128)) throw new HttpError(400, 'Provide up to 100 nonempty tag names of at most 128 characters.');
+  const tags = [...new Set(rawTags.map(tag => tag.trim()))];
+  if (tags.length) where.AND = tags.map(name => ({ tags: { some: { tag: { name } } } }));
+  return where;
+}
+
 export async function createApp(db = createDatabaseClient()) {
   requireCredentials();
   const sync = createIndexer(db);
@@ -78,8 +98,22 @@ export async function createApp(db = createDatabaseClient()) {
   app.get('/api/health', (req, res) => res.json({ ok: true }));
   app.get('/api/doctor', async (req, res) => res.json(await runCommand(['doctor', ...(req.query.refresh === '1' ? ['--refresh'] : [])])));
   app.get('/api/problems', async (req, res) => {
+    const where = problemFilters(req.query);
     await sync();
-    res.json(await db.problem.findMany({ orderBy: { id: 'asc' }, include: { solutions: true, runs: { orderBy: { startedAt: 'desc' }, take: 1 } } }));
+    res.json((await db.problem.findMany({ where, orderBy: { id: 'asc' }, include: problemRelations })).map(problemView));
+  });
+  app.get('/api/tags', async (req, res) => {
+    await sync();
+    const tags = await db.tag.findMany({ where: { problems: { some: {} } }, orderBy: { name: 'asc' }, include: { _count: { select: { problems: true } } } });
+    res.json(tags.map(tag => ({ id: tag.id, name: tag.name, count: tag._count.problems })));
+  });
+  app.patch('/api/problems/:id', async (req, res) => {
+    const id = Number(req.params.id);
+    problemDir(req.params.id);
+    if (typeof req.body?.accepted !== 'boolean') throw new HttpError(400, 'Provide accepted as true or false.');
+    await syncProblem(db, id);
+    const problem = await db.problem.update({ where: { id }, data: { accepted: req.body.accepted } });
+    res.json({ id, accepted: problem.accepted });
   });
   app.post('/api/problems', async (req, res) => {
     if (req.body?.overwrite === true && [...active].some(key => key.startsWith(`${req.body.manifest?.id}/`))) throw new HttpError(409, "Wait for this problem's active web run to finish before overwriting.");
@@ -89,10 +123,10 @@ export async function createApp(db = createDatabaseClient()) {
   });
   app.get('/api/problems/:id', async (req, res) => {
     await syncProblem(db, req.params.id);
-    const problem = await db.problem.findUnique({ where: { id: Number(req.params.id) }, include: { solutions: true, runs: { orderBy: { startedAt: 'desc' }, take: 40 }, submissions: { orderBy: { createdAt: 'desc' }, take: 40 } } });
+    const problem = await db.problem.findUnique({ where: { id: Number(req.params.id) }, include: { solutions: true, tags: { include: { tag: true } }, runs: { orderBy: { startedAt: 'desc' }, take: 40 }, submissions: { orderBy: { createdAt: 'desc' }, take: 40 } } });
     const dir = problemDir(req.params.id);
     const testsFile = ownedFile(dir, 'tests.json');
-    res.json({ ...problem, manifest: readJSON(ownedFile(dir, 'manifest.json')), description: fs.readFileSync(ownedFile(dir, 'description.md'), 'utf8'), tests: readJSON(testsFile), testsHash: hash(fs.readFileSync(testsFile)) });
+    res.json({ ...problemView(problem), manifest: readJSON(ownedFile(dir, 'manifest.json')), description: fs.readFileSync(ownedFile(dir, 'description.md'), 'utf8'), tests: readJSON(testsFile), testsHash: hash(fs.readFileSync(testsFile)) });
   });
   app.get('/api/problems/:id/solutions/:variant', (req, res) => {
     const code = fs.readFileSync(solutionFile(req.params.id, req.params.variant), 'utf8');

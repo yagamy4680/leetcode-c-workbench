@@ -51,6 +51,29 @@ CLI tests require neither the Node.js server nor SQLite. The server imports comp
 
 Exit codes: `0` for all tests passing, `1` for compilation or test failure, `2` for configuration or framework errors, and `130` for user interruption.
 
+## Accepted status and topic filters
+
+A green **passed** label in the sidebar means the latest local run passed.
+After LeetCode accepts your submission, check **Accepted on LeetCode** in the
+problem header. This is a manual problem-level mark, independent of local test
+results and submission history. Uncheck it to clear the mark. Editing a solution,
+re-indexing, and confirmed problem replacement preserve it.
+
+Use **LeetCode status** to show all, accepted, or not-accepted problems. Expand
+**Tags** and select multiple topics to require every selected tag. Search by
+ID/title combines with these filters; **Clear filters** resets them all. Topic
+names use their canonical case and spelling; whitespace and duplicate topics
+are normalized. Counts beside tags show all indexed problems using each tag.
+
+Topics are indexed in `Tag` and `ProblemTag`; the original serialized topics
+field remains for compatibility. Unique tag names, a composite problem/tag key,
+a reverse tag/problem index, and an accepted/id index support filtering. The
+server backfills existing topics and applies the reviewed additive upgrade at
+`prisma/updates/20261014-accepted-tags.sql` on startup. Existing code, run records,
+and submission snapshots are preserved. Updating an older checkout requires
+`git pull`, `npm ci` (including Prisma Client generation), and a service restart;
+no database reset is needed.
+
 ## Fetching and validating problems
 
 Follow [skills/fetch-leetcode-problem/SKILL.md](skills/fetch-leetcode-problem/SKILL.md)

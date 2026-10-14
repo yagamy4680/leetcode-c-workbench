@@ -246,7 +246,7 @@ Compact search, solution, case, and mode controls use Bootstrap fields. Inputs h
 
 ### Navigation
 
-The problem list presents an ID/title and a second metadata line. Hover and current states use separate neutral tints, and the current problem has `aria-current="page"`. The four section buttons use Bootstrap tab borders and the same current-state attribute. Their panels are hidden when inactive.
+The problem list presents an ID/title and a second metadata line. Its local passed status uses the existing passed green with bold text; a separate accent-blue Accepted label represents the manual LeetCode outcome. The problem header exposes that state as a native labeled checkbox. Sidebar status filtering and a collapsible, scrollable topic checklist combine with text search; multiple checked topics require all matches. A clear action and written result count make the filter state visible. Hover and current states use separate neutral tints, and the current problem has `aria-current="page"`. The four section buttons use Bootstrap tab borders and the same current-state attribute. Their panels are hidden when inactive.
 
 ### Source editor
 

@@ -114,3 +114,32 @@ test('relative SQLite URLs resolve consistently against the schema directory', (
   assert.equal(result.databaseUrl, `file:${database}`);
   assert.equal(result.count, 4);
 }));
+
+test('legacy schema upgrades add accepted and indexed tags without losing personal data or history',()=>fixture(temp=>{
+  const data=path.join(temp,'workspace'),env=fixtureEnv(data);
+  runNode(`
+    const {createApp}=await import(${JSON.stringify(serverURL)});const app=await createApp();
+    await app.db.submission.create({data:{id:'legacy-submission',problemId:94,solution:'master',sourceHash:'old',commitSha:'old',memo:'keep my history'}});
+    await app.db.problem.create({data:{id:50000,title:'Legacy metadata',slug:'legacy',difficulty:'Easy',topics:'["Legacy", " Legacy "]',url:'https://leetcode.com/problems/legacy/'}});
+    console.log('RESULT_JSON:'+JSON.stringify({ok:true}));await app.close();
+  `,env,temp);
+  const source=path.join(data,'problems/94/solution-master.c');fs.writeFileSync(source,'/* personal code */');
+  execFileSync('python3',['-c',`import sqlite3,sys
+con=sqlite3.connect(sys.argv[1])
+con.executescript('DROP TABLE ProblemTag; DROP TABLE Tag; DROP INDEX Problem_accepted_id_idx; ALTER TABLE Problem DROP COLUMN accepted;')
+con.close()`,path.join(data,'workbench.db')]);
+  const result=runNode(`
+    const {createApp}=await import(${JSON.stringify(serverURL)});let app=await createApp();
+    const old=await app.db.problem.findUnique({where:{id:50000},include:{tags:{include:{tag:true}}}});
+    const before=await app.db.problem.findUnique({where:{id:94}});
+    await app.db.problem.update({where:{id:94},data:{accepted:true}});await app.close();
+    app=await createApp();const accepted=(await app.db.problem.findUnique({where:{id:94}})).accepted;
+    const memo=(await app.db.submission.findUnique({where:{id:'legacy-submission'}})).memo;
+    const indexes=(await app.db.$queryRawUnsafe('PRAGMA index_list("ProblemTag")')).map(index=>index.name);
+    console.log('RESULT_JSON:'+JSON.stringify({defaultAccepted:before.accepted,accepted,memo,tags:old.tags.map(relation=>relation.tag.name),indexes}));await app.close();
+  `,env,temp);
+  assert.equal(result.defaultAccepted,false);assert.equal(result.accepted,true);
+  assert.equal(result.memo,'keep my history');assert.deepEqual(result.tags,['Legacy']);
+  assert.ok(result.indexes.includes('ProblemTag_tagId_problemId_idx'));
+  assert.equal(fs.readFileSync(source,'utf8'),'/* personal code */');
+}));

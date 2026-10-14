@@ -36,6 +36,16 @@
       <div class="sidebar-heading"><h1>Problems</h1><button type="button" id="refresh-btn" class="btn btn-sm btn-link">Refresh</button></div>
       <label for="search" class="visually-hidden">Find a problem</label>
       <input id="search" type="search" class="form-control form-control-sm" placeholder="Find by ID or title">
+      <div class="problem-filters">
+        <label for="accepted-filter">LeetCode status</label>
+        <select id="accepted-filter" class="form-select form-select-sm"><option value="">All problems</option><option value="true">Accepted</option><option value="false">Not accepted</option></select>
+        <details id="tag-filters"><summary id="tag-filter-summary">Tags</summary>
+          <p class="muted filter-hint">Match all selected tags.</p>
+          <fieldset id="tag-options"><legend class="visually-hidden">Filter by topics</legend></fieldset>
+        </details>
+        <button id="clear-filters" type="button" class="btn btn-sm btn-link" hidden>Clear filters</button>
+        <p id="filter-status" class="muted filter-hint" role="status" aria-live="polite"></p>
+      </div>
       <nav id="problems" aria-label="Problem list"><p class="muted">Loading problems…</p></nav>
     </aside>
     <main id="main">
@@ -43,7 +53,10 @@
       <section id="problem" hidden aria-labelledby="problem-title">
         <div class="problem-heading">
           <div><h2 id="problem-title"></h2><p id="problem-meta" class="muted"></p></div>
+          <div class="problem-actions">
+            <label class="accepted-control"><input id="problem-accepted" type="checkbox" class="form-check-input"> Accepted on LeetCode</label>
           <a id="original-link" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer">Open LeetCode</a>
+          </div>
         </div>
         <nav class="nav nav-tabs" aria-label="Problem sections">
           <button type="button" class="nav-link active" data-tab="solution" aria-current="page">Solution</button>

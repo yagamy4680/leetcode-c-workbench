@@ -6,8 +6,19 @@ import { hash, readJSON, problemDir, ownedFile } from './workspace.mjs';
 export async function syncProblem(db, id) {
   const dir = problemDir(id);
   const meta = readJSON(ownedFile(dir, 'manifest.json'));
-  const fields = { title: meta.title, slug: meta.slug, difficulty: meta.difficulty, topics: JSON.stringify(meta.topics), url: meta.url };
-  await db.problem.upsert({ where: { id: Number(id) }, create: { id: Number(id), ...fields }, update: fields });
+  const topics = [...new Set(meta.topics.map(topic => topic.trim()).filter(Boolean))];
+  const fields = { title: meta.title, slug: meta.slug, difficulty: meta.difficulty, topics: JSON.stringify(topics), url: meta.url };
+  await db.$transaction(async tx => {
+    // Accepted is user-owned metadata; imports and indexing must never reset it.
+    await tx.problem.upsert({ where: { id: Number(id) }, create: { id: Number(id), ...fields }, update: fields });
+    const tagIds = [];
+    for (const topic of topics) {
+      const tag = await tx.tag.upsert({ where: { name: topic }, create: { name: topic }, update: {} });
+      tagIds.push(tag.id);
+      await tx.problemTag.upsert({ where: { problemId_tagId: { problemId: Number(id), tagId: tag.id } }, create: { problemId: Number(id), tagId: tag.id }, update: {} });
+    }
+    await tx.problemTag.deleteMany({ where: { problemId: Number(id), tagId: { notIn: tagIds } } });
+  });
   const names = [];
   for (const filename of fs.readdirSync(dir)) {
     const match = /^solution-([A-Za-z0-9][A-Za-z0-9_-]{0,63})\.c$/.exec(filename);
