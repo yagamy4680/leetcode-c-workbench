@@ -45,6 +45,8 @@ Names such as `master` and `non-recursive` identify solution files, not Git bran
 
 You can also use `make run PROBLEM=589 SOLUTION=non-recursive MODE=debug`. Run `make help` for other entry points.
 
+While the web server is running, changes to the selected `solution-*.c` file are pushed to the browser through an authenticated SSE connection. The server watches the containing directory to handle atomic editor saves and checks once per second as a fallback. A clean editor updates automatically, retaining its selection and scroll position. Unsaved browser edits are preserved with a disk-change warning; copy them before choosing **Reload from disk**. Updates arriving during saving, loading, testing, or snapshot preparation are deferred. Reconnection checks the current disk hash again.
+
 CLI tests require neither the Node.js server nor SQLite. The server imports completed CLI runs when running or restarting; run IDs prevent duplicate records.
 
 Exit codes: `0` for all tests passing, `1` for compilation or test failure, `2` for configuration or framework errors, and `130` for user interruption.
@@ -90,6 +92,8 @@ ASAN_OPTIONS=detect_leaks=0 lldb -- \
 Here, `WB_DATA_DIR` must be a shell variable containing the actual workspace path; `.env` does not automatically export terminal variables. Disabling leak detection for the debugger does not change the original test record.
 
 ## Framework and ownership
+
+New REST/web imports and newly seeded example problems prepend [templates/solution-preamble.c](templates/solution-preamble.c) to `solution-master.c`. Existing workspace solutions are preserved. The prefix stays in submission snapshots and copied LeetCode code. Debug mode defines `DEBUG`, enabling `DBG()` output on stderr with file, line, and function; performance mode and ordinary LeetCode compilation leave it disabled. The disabled macro does not evaluate arguments. Both `DBG("message\n")` and `DBG("value=%d\n", value)` are supported using the GNU11 variadic-macro extension. Cloned variants inherit the prefix from their source.
 
 Each problem includes at least `manifest.json`, `description.md`, `solution.h`, `main.c`, `solution-master.c`, and `tests.json`.
 

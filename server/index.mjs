@@ -9,6 +9,8 @@ import { createDatabaseClient, ensureDatabase } from './database.mjs';
 import { HttpError, hash, readJSON, name, problemDir, ownedFile, solutionFile, atomic, saveChecked, validateTests, importBundle } from './workspace.mjs';
 import { createIndexer, syncProblem } from './indexer.mjs';
 
+import { createSourceEvents } from './source-events.mjs';
+
 export function auth(req, res, next) {
   const header = req.get('authorization') || '';
   const actual = header.startsWith('Basic ') ? Buffer.from(header.slice(6), 'base64').toString('utf8') : '';
@@ -45,6 +47,7 @@ export async function createApp(db = createDatabaseClient()) {
     await db.$disconnect();
     throw error;
   }
+  const sourceEvents = createSourceEvents();
   const app = express();
   app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -91,8 +94,9 @@ export async function createApp(db = createDatabaseClient()) {
   });
   app.get('/api/problems/:id/solutions/:variant', (req, res) => {
     const code = fs.readFileSync(solutionFile(req.params.id, req.params.variant), 'utf8');
-    res.json({ code, hash: hash(code) });
+    res.set('Cache-Control', 'no-store').json({ code, hash: hash(code) });
   });
+  app.get('/api/problems/:id/solutions/:variant/events', (req, res) => sourceEvents.subscribe(req.params.id, name(req.params.variant), res));
   app.put('/api/problems/:id/solutions/:variant', async (req, res) => {
     if (typeof req.body.code !== 'string' || Buffer.byteLength(req.body.code) > 1024 * 1024) throw new HttpError(400, 'Provide code under 1 MiB.');
     const newHash = saveChecked(solutionFile(req.params.id, req.params.variant), req.body.code, req.body.expectedHash);
@@ -193,16 +197,19 @@ export async function createApp(db = createDatabaseClient()) {
   });
   const interval = setInterval(() => sync().catch(error => console.error('Indexing:', error.message)), 2000);
   interval.unref();
-  return { app, db, close: async () => { clearInterval(interval); await db.$disconnect(); } };
+  return { app, db, stopSourceEvents: () => sourceEvents.close(), close: async () => { clearInterval(interval); sourceEvents.close(); await db.$disconnect(); } };
 }
 
 if (process.argv[1] === path.join(appDir, 'server/index.mjs')) {
   try {
-    const { app, close } = await createApp();
+    const { app, close, stopSourceEvents } = await createApp();
     console.log(`Workspace: ${dataDir}`);
     console.log(`SQLite database: ${databaseFile}`);
     const server = app.listen(port, host, () => console.log(`LeetCode C Workbench listening at http://${host}:${port}`));
-    for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => server.close(async () => { await close(); process.exit(0); }));
+    for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => {
+      stopSourceEvents();
+      server.close(async () => { await close(); process.exit(0); });
+    });
   } catch (error) {
     console.error(`Startup failed: ${error.message}`);
     process.exitCode = 1;

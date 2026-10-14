@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { dataDir } from './config.mjs';
+import { appDir, dataDir } from './config.mjs';
 
 export class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -69,7 +69,10 @@ export function importBundle(bundle) {
   try {
     for (const [filename, content] of Object.entries(files)) {
       if (!/^[A-Za-z0-9_-]+\.(c|h)$/.test(filename) || typeof content !== 'string' || Buffer.byteLength(content) > 1024 * 1024) throw new HttpError(400, 'Invalid framework file.');
-      fs.writeFileSync(path.join(staging, filename), content);
+      const source = filename === 'solution-master.c' && !/^#define WB_DEBUG_PREAMBLE$/m.test(content)
+        ? fs.readFileSync(path.join(appDir, 'templates/solution-preamble.c'), 'utf8') + content : content;
+      if (Buffer.byteLength(source) > 1024 * 1024) throw new HttpError(400, 'Framework file exceeds 1 MiB with its preamble.');
+      fs.writeFileSync(path.join(staging, filename), source);
     }
     fs.writeFileSync(path.join(staging, 'manifest.json'), JSON.stringify({ ...meta, sources, headers }, null, 2) + '\n');
     fs.writeFileSync(path.join(staging, 'description.md'), description);

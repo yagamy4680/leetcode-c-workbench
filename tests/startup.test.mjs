@@ -56,7 +56,7 @@ test('setup and runtime use the same custom database; restarts preserve records'
   // Run the actual setup script in an isolated checkout so no real .env changes.
   const checkout = path.join(temp, 'checkout');
   fs.mkdirSync(checkout);
-  for (const name of ['scripts/setup.mjs', 'server/config.mjs', 'server/database.mjs', 'runner/workbench.py', 'prisma/schema.prisma']) {
+  for (const name of ['scripts/setup.mjs', 'server/config.mjs', 'server/database.mjs', 'runner/workbench.py', 'prisma/schema.prisma', 'templates/solution-preamble.c']) {
     const dest = path.join(checkout, name);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(path.join(root, name), dest);

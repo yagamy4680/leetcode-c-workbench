@@ -21,6 +21,12 @@ async function harness(handler=()=>undefined) {
   const dom=new JSDOM(html,{runScripts:'outside-only',url:'http://127.0.0.1:3089/'}),w=dom.window,calls=[];
   w.marked=marked;w.DOMPurify=createDOMPurify(w);w.confirm=()=>true;w.Prism=Prism;
   w.TextDecoder=TextDecoder;
+  w.EventSource=class {
+    static instances=[];
+    constructor(url){this.url=url;w.EventSource.instances.push(this);}
+    close(){this.closed=true;}
+    emit(hash){this.onmessage?.({data:JSON.stringify({hash})});}
+  };
   w.HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
   w.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
   w.fetch=async(route,opts={})=>{
@@ -31,7 +37,7 @@ async function harness(handler=()=>undefined) {
     if(route.endsWith('/solutions/master'))return response({code:'initial',hash:'source-hash'});
     throw new Error(`Unexpected request ${call.method} ${route}`);
   };
-  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode};');
+  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode,refreshExternalCode};');
   await pause();await w.hooks.loadProblem(1480);
   return {w,calls,$:id=>w.document.getElementById(id),close:()=>w.close()};
 }
@@ -132,4 +138,34 @@ test('Tab insertion refreshes tokens and saving uses exact textarea source',asyn
   assert.equal(h.$('highlight-code').textContent,h.$('code').value);
   await h.w.hooks.saveCode();
   assert.equal(h.calls.find(c=>c.method==='PUT').body.code,'    int x = 42;');h.close();
+});
+
+test('disk change events update a clean editor and close the previous subscription',async()=>{
+  let disk={code:'initial',hash:'source-hash'};
+  const h=await harness(call=>call.route.endsWith('/solutions/master')?response(disk):undefined);
+  const stream=h.w.EventSource.instances.at(-1);
+  assert.equal(stream.url,'/api/problems/1480/solutions/master/events');
+  disk={code:'int updated;\n',hash:'disk-hash'};stream.emit('disk-hash');
+  await new Promise(resolve=>setTimeout(resolve,150));
+  assert.equal(h.$('code').value,disk.code);assert.equal(h.w.hooks.state.sourceHash,'disk-hash');
+  assert.equal(h.w.hooks.dirty(),false);assert.match(h.$('notice').textContent,/updated from disk/);
+  await h.w.hooks.loadProblem(589);assert.equal(stream.closed,true);h.close();
+});
+test('external changes preserve unsaved browser edits and their original CAS hash',async()=>{
+  let disk={code:'initial',hash:'source-hash'};
+  const h=await harness(call=>call.route.endsWith('/solutions/master')?response(disk):undefined);
+  h.$('code').value='my unsaved changes';disk={code:'external',hash:'disk-hash'};
+  await h.w.hooks.refreshExternalCode();
+  assert.equal(h.$('code').value,'my unsaved changes');assert.equal(h.w.hooks.state.sourceHash,'source-hash');
+  assert.match(h.$('saved-state').textContent,/Changed on disk/);
+  assert.match(h.$('notice').textContent,/preserved/);h.close();
+});
+test('typing during an external refresh and navigation both reject stale source responses',async()=>{
+  let pending;const h=await harness(call=>pending&&call.route==='/api/problems/1480/solutions/master'?pending.promise:undefined);
+  pending=deferred();let refresh=h.w.hooks.refreshExternalCode();h.$('code').value='typed while fetching';
+  pending.resolve(response({code:'external',hash:'disk-hash'}));await refresh;
+  assert.equal(h.$('code').value,'typed while fetching');
+  h.$('code').value='initial';pending=deferred();refresh=h.w.hooks.refreshExternalCode();
+  await h.w.hooks.loadProblem(589);pending.resolve(response({code:'old problem',hash:'stale'}));await refresh;
+  assert.equal(h.w.hooks.state.problem.id,589);assert.equal(h.$('code').value,'initial');h.close();
 });

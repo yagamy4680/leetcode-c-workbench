@@ -10,6 +10,7 @@ All endpoints require HTTP Basic Auth, including static files. Use HTTPS at `lee
 | POST | `/api/problems` | Atomic new problem import; existing ID returns 409 |
 | GET | `/api/problems/:id` | Metadata, markdown, tests/hash, recent history |
 | GET | `/api/problems/:id/solutions/:name` | Code and hash |
+| GET | `/api/problems/:id/solutions/:name/events` | SSE current hash and disk-change notifications |
 | PUT | `/api/problems/:id/solutions/:name` | Save `{code, expectedHash}` |
 | POST | `/api/problems/:id/solutions` | Clone `{name, from}`; from defaults to master |
 | PUT | `/api/problems/:id/tests` | Save `{tests, expectedHash}` |
@@ -52,6 +53,8 @@ ChatGPT should obtain the actual C snippet/signature, create the driver and help
 }
 ```
 
+On import, `solution-master.c` receives the default debug preamble unless its `WB_DEBUG_PREAMBLE` marker is already present. This becomes part of the solution and submission source. Existing problem IDs are never overwritten. Local helper files can make a bundle self-contained; updating shared runtime helpers requires updating the application first.
+
 The above file contents are explanatory placeholders, not compilable C. Create a runnable bundle from a shipped example:
 
 ```bash
@@ -80,3 +83,9 @@ Each case's default timeout is 2000 ms, adjustable from 10–60000 ms. Each proc
 ## Snapshot semantics
 
 Preparing a submission returns the exact code, sourceHash, commitSha, optional matching runId, and testStatus. It does not submit to LeetCode. A matched run uses a digest of the complete captured context, not just the solution file. Success/fail and memo are user-entered LeetCode outcomes; local tests retain their own status.
+
+## Source change events
+
+`GET /api/problems/:id/solutions/:name/events` requires the same Basic Auth as other endpoints. It returns `text/event-stream`, immediately sending `data: {"hash":"..."}` and sending the current content hash on subsequent changes. A null hash means the file is missing or no longer a safe regular workspace file. Heartbeat comments keep idle streams alive. Reconnects receive the current hash; clients fetch the source from the normal solution endpoint rather than treating an event as source content.
+
+Only solutions with active subscribers are watched. Directory watchers handle atomic replacement saves; a one-second polling fallback covers missed events. Disconnecting the last subscriber releases its watcher and timers. Proxies must stream responses rather than buffer them. Caddy's supplied reverse proxy configuration supports SSE.

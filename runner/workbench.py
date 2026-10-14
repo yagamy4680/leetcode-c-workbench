@@ -108,6 +108,10 @@ def init(data):
             dest = data / 'problems' / source.name
             if not dest.exists():
                 shutil.copytree(source, dest)
+                solution = dest / 'solution-master.c'
+                code = solution.read_text(encoding='utf-8')
+                if '#define WB_DEBUG_PREAMBLE' not in code.splitlines():
+                    solution.write_text((APP / 'templates/solution-preamble.c').read_text(encoding='utf-8') + code, encoding='utf-8')
     return {'dataDir': str(data), 'problems': sorted(p.name for p in (data / 'problems').iterdir() if p.is_dir() and p.name.isdigit())}
 
 
@@ -301,7 +305,7 @@ def run(data, args):
         raise ValueError('Compiler does not support ASan/UBSan. Select a supported compiler or --mode perf.')
     flags = ['-std=gnu11', '-g', '-Wall', '-Wextra', '-Werror=implicit-function-declaration', '-fno-omit-frame-pointer']
     if args.mode == 'debug':
-        flags += ['-O1', '-fsanitize=address,undefined', '-fno-sanitize-recover=all']
+        flags += ['-DDEBUG', '-O1', '-fsanitize=address,undefined', '-fno-sanitize-recover=all']
         if sys.platform.startswith('linux'):
             flags.append('-no-pie')
     else:

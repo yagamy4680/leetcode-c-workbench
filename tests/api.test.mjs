@@ -31,6 +31,7 @@ after(async()=>{if(server){server.closeAllConnections();await new Promise(resolv
 test('all application endpoints require authentication',async()=>{
   assert.equal((await fetch(base+'/api/problems')).status,401);
   assert.equal((await fetch(base+'/')).status,401);
+  assert.equal((await fetch(base+'/api/problems/1480/solutions/master/events')).status,401);
   assert.equal((await request('/api/health')).status,200);
   for(const file of ['/','/app.js','/style.css','/utilities.css','/vendor/bootstrap.css','/vendor/marked.js','/vendor/purify.js','/vendor/prism-core.js','/vendor/prism-clike.js','/vendor/prism-c.js']) assert.equal((await request(file)).status,200,file);
 });
@@ -63,6 +64,12 @@ test('problem import is atomic and never overwrites an existing problem',async()
   assert.equal(fs.existsSync(path.join(data,'problems/999')),false);
   assert.equal((await request('/api/problems','POST',bundle)).status,201);
   assert.equal((await request('/api/problems','POST',bundle)).status,409);
+  const imported=fs.readFileSync(path.join(data,'problems/999/solution-master.c'),'utf8');
+  assert.ok(imported.startsWith(fs.readFileSync('templates/solution-preamble.c','utf8')));
+  assert.ok(imported.endsWith(files['solution-master.c']));
+  const again={...bundle,manifest:{...manifest,id:998},files:{...files,'solution-master.c':imported}};
+  assert.equal((await request('/api/problems','POST',again)).status,201);
+  assert.equal(fs.readFileSync(path.join(data,'problems/998/solution-master.c'),'utf8'),imported);
 });
 test('web runs stream diagnostics and create a persisted report',async()=>{
   const source=await(await request('/api/problems/1480/solutions/master')).json();
@@ -99,4 +106,30 @@ test('CLI results are imported after offline execution and remain idempotent',as
   assert.equal(count,2);
   await request('/api/problems');await request('/api/problems');
   assert.equal(await db.run.count({where:{problemId:1480}}),count);
+});
+
+test('source events survive atomic replacement, repeated saves, deletion and recreation',async()=>{
+  await request('/api/problems/1480/solutions','POST',{name:'live'});
+  const file=path.join(data,'problems/1480/solution-live.c');
+  const controller=new AbortController();
+  const response=await fetch(base+'/api/problems/1480/solutions/live/events',{headers:{Authorization:auth},signal:controller.signal});
+  assert.match(response.headers.get('content-type'),/text\/event-stream/);
+  const reader=response.body.getReader();let pending='';
+  async function next(){
+    const deadline=AbortSignal.timeout(4000);
+    while(true){
+      const split=pending.indexOf('\n\n');
+      if(split>=0){const frame=pending.slice(0,split);pending=pending.slice(split+2);if(frame.startsWith('data: '))return JSON.parse(frame.slice(6));continue;}
+      const chunk=await Promise.race([reader.read(),new Promise((_,reject)=>deadline.addEventListener('abort',()=>reject(new Error('SSE timeout')),{once:true}))]);
+      assert.equal(chunk.done,false);pending+=new TextDecoder().decode(chunk.value);
+    }
+  }
+  try {
+    assert.ok((await next()).hash);
+    fs.writeFileSync(file+'.tmp','/* atomic replacement */');fs.renameSync(file+'.tmp',file);
+    const first=await next();assert.ok(first.hash);
+    fs.writeFileSync(file,'/* second save */');const second=await next();assert.notEqual(second.hash,first.hash);
+    fs.unlinkSync(file);assert.equal((await next()).hash,null);
+    fs.writeFileSync(file,'/* restored */');assert.ok((await next()).hash);
+  } finally {controller.abort();await reader.cancel().catch(()=>{});}
 });

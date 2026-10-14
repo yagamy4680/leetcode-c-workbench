@@ -62,6 +62,24 @@ class RunnerTests(unittest.TestCase):
                 self.assertEqual(report['passed'], report['total'])
                 self.assertNotEqual((self.data/'problems'/str(problem)/'solution-master.c').read_text(), code)
 
+    def test_debug_preamble_logs_only_in_debug_and_is_not_added_to_existing_files(self):
+        file = self.data/'problems/1480/solution-master.c'
+        preamble = (ROOT/'templates/solution-preamble.c').read_text()
+        self.assertTrue(file.read_text().startswith(preamble))
+        code = preamble + ARRAY.replace('int *out=malloc', 'DBG("hello\\n"); DBG("n=%d\\n", n); int *out=malloc')
+        self.code(1480, code)
+        _, debug = self.run_problem(1480, 'master', '--case', 'single')
+        self.assertEqual(debug['status'], 'passed')
+        log = (self.data/'runs'/debug['id']/'cases/single/run.stderr.log').read_text()
+        self.assertIn('hello', log)
+        self.assertIn('n=1', log)
+        _, perf = self.run_problem(1480, 'master', '--case', 'single', '--mode', 'perf')
+        self.assertEqual(perf['status'], 'passed')
+        self.assertEqual((self.data/'runs'/perf['id']/'cases/single/run.stderr.log').read_text(), '')
+        self.code(1480, ARRAY)
+        wb.init(self.data)
+        self.assertEqual(file.read_text(), ARRAY)
+
     def test_large_and_deep_nary_trees(self):
         self.code(589, NARY)
         star = [1, None] + list(range(1,10000))

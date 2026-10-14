@@ -1,6 +1,6 @@
 /* Plain browser JS; all persistent edits use hashes to protect local changes. */
 const $ = id => document.getElementById(id);
-const state = { problems: [], problem: null, variant: 'master', sourceHash: '', savedCode: '', testsHash: '', savedTests: '', report: null, running: false, preparing: false, loading: false, viewEpoch: 0, savingCode: null, savingTests: null, snapshot: null, live: '' };
+const state = { problems: [], problem: null, variant: 'master', sourceHash: '', savedCode: '', testsHash: '', savedTests: '', report: null, running: false, preparing: false, loading: false, viewEpoch: 0, savingCode: null, savingTests: null, snapshot: null, live: '', externalConflict: false };
 const esc = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const label = value => String(value).replaceAll('_', ' ');
 const date = value => new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -32,7 +32,7 @@ function highlightCode() {
   }
   syncEditorScroll();
 }
-function lines() { $('line-numbers').textContent = Array.from({ length: $('code').value.split('\n').length }, (_, i) => i + 1).join('\n'); $('saved-state').textContent = dirty() ? 'Unsaved changes' : 'Saved'; highlightCode(); }
+function lines() { $('line-numbers').textContent = Array.from({ length: $('code').value.split('\n').length }, (_, i) => i + 1).join('\n'); $('saved-state').textContent = state.externalConflict ? 'Changed on disk — reload required' : (dirty() ? 'Unsaved changes' : 'Saved'); highlightCode(); }
 function activateTab(tab) {
   document.querySelectorAll('[data-tab]').forEach(button => { const on = button.dataset.tab === tab; button.classList.toggle('active', on); if (on) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current'); });
   for (const name of ['solution', 'tests', 'description', 'history']) $(`${name}-tab`).hidden = name !== tab;
@@ -45,9 +45,60 @@ function renderProblems() {
 }
 async function refresh() { state.problems = await json('/api/problems'); renderProblems(); }
 function applyCode(result, variant) {
+  state.externalConflict = false;
   state.variant = variant; state.sourceHash = result.hash; state.savedCode = result.code;
-  $('code').value = result.code; $('variant').value = variant; $('code-label').textContent = `solution-${variant}.c`; lines();
+  $('code').value = result.code; $('variant').value = variant; $('code-label').textContent = `solution-${variant}.c`; lines(); connectSourceEvents();
 }
+let sourceEvents = null, sourceEventsKey = '', sourceRefreshTimer;
+function connectSourceEvents() {
+  if (!window.EventSource || !state.problem) return;
+  const key = `${state.problem.id}/${state.variant}`;
+  if (key === sourceEventsKey) return;
+  sourceEvents?.close(); clearTimeout(sourceRefreshTimer);
+  sourceEventsKey = key;
+  const stream = sourceEvents = new EventSource(`/api/problems/${state.problem.id}/solutions/${encodeURIComponent(state.variant)}/events`);
+  stream.onmessage = event => {
+    if (stream !== sourceEvents) return;
+    const update = JSON.parse(event.data);
+    if (update.hash !== state.sourceHash || state.externalConflict) scheduleSourceRefresh();
+  };
+}
+function scheduleSourceRefresh() {
+  clearTimeout(sourceRefreshTimer);
+  sourceRefreshTimer = setTimeout(() => refreshExternalCode().catch(error => notice(error.message, true)), 100);
+}
+async function refreshExternalCode() {
+  if (!state.problem) return;
+  if (navigationBusy()) { scheduleSourceRefresh(); return; }
+  const id = state.problem.id, variant = state.variant, epoch = state.viewEpoch;
+  const baseline = state.sourceHash;
+  let result;
+  try { result = await json(`/api/problems/${id}/solutions/${encodeURIComponent(variant)}`); }
+  catch (error) {
+    if (epoch !== state.viewEpoch) return;
+    state.externalConflict = true; lines();
+    notice('Cannot read the solution on disk. Browser content is preserved; restore the file and reload.', true);
+    return;
+  }
+  if (epoch !== state.viewEpoch || state.problem.id !== id || state.variant !== variant) return;
+  // Recheck after the fetch: typing or saving may have started in flight.
+  if (navigationBusy() || state.sourceHash !== baseline) { scheduleSourceRefresh(); return; }
+  if (result.hash === state.sourceHash) { state.externalConflict = false; lines(); return; }
+  if (dirty()) {
+    state.externalConflict = true; lines();
+    notice('Solution changed on disk. Your unsaved browser edits are preserved. Copy them before using Reload from disk.', true);
+    return;
+  }
+  const editor = $('code');
+  const start = editor.selectionStart, end = editor.selectionEnd, top = editor.scrollTop, left = editor.scrollLeft;
+  applyCode(result, variant);
+  editor.setSelectionRange(Math.min(start, result.code.length), Math.min(end, result.code.length));
+  editor.scrollTop = top; editor.scrollLeft = left; syncEditorScroll();
+  if (state.report) showReport(state.report);
+  notice('Solution updated from disk.');
+}
+window.addEventListener('pagehide', () => { sourceEvents?.close(); clearTimeout(sourceRefreshTimer); });
+window.addEventListener('pageshow', event => { if (event.persisted) { sourceEventsKey = ''; connectSourceEvents(); } });
 async function loadCode(variant = state.variant, epoch = ++state.viewEpoch) {
   const id = state.problem.id; state.loading = true;
   try {
