@@ -303,7 +303,7 @@ def run(data, args):
     capabilities = doctor(data) if args.mode == 'debug' else {'leakSanitizer': False}
     if args.mode == 'debug' and not (capabilities['addressSanitizer'] and capabilities['undefinedSanitizer']):
         raise ValueError('Compiler does not support ASan/UBSan. Select a supported compiler or --mode perf.')
-    flags = ['-std=gnu11', '-g', '-Wall', '-Wextra', '-Werror=implicit-function-declaration', '-fno-omit-frame-pointer']
+    flags = ['-std=gnu11', '-g', '-Wall', '-Wextra', '-Werror', '-fno-omit-frame-pointer']
     if args.mode == 'debug':
         flags += ['-DDEBUG', '-O1', '-fsanitize=address,undefined', '-fno-sanitize-recover=all']
         if sys.platform.startswith('linux'):

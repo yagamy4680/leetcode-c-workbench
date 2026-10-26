@@ -132,6 +132,12 @@ After saving, select the new case in **Run tests** to reproduce the failure.
 
 Debug mode uses GNU11, `-O1 -g`, warnings, ASan, UBSan, and frame pointers. Performance mode uses `-O2` with sanitizers disabled. Set `CC` to select a compiler; otherwise, the runner prefers `clang`, then `cc`. `CC` must be an executable path, without additional flags.
 
+Both modes compile with `-Wall -Wextra -Werror`. Compiler warnings are errors:
+fix every reported warning before any test case can execute. This applies to
+CLI and web runs, including solution, driver, and helper sources. Failed builds
+return `compile_error` with the complete compiler diagnostics. Changing these
+flags invalidates older cached builds automatically.
+
 `doctor` compiles and runs probes to verify sanitizer capabilities. LeakSanitizer is tested with a known leak; an unchecked capability is never reported as working. If Apple Clang cannot run the leak probe on your Mac, you can install upstream LLVM, set `CC` to its absolute `clang` path, and run `doctor --refresh`. ASan, UBSan, and leak detection are reported separately.
 
 Each test case runs in a separate C process with a timeout, process-group cleanup, and bounded logs. A crashing case does not prevent later cases from running. The runner compiles once and reuses the binary across cases. Changes to code, headers, helpers, compiler, or flags trigger rebuilding; changing only tests does not.

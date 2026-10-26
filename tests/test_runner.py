@@ -22,7 +22,8 @@ ARRAY = '''int* runningSum(int* nums, int n, int* size) {
     *size=n; printf("processed %d elements\\n",n); return out;
 }'''
 BST = '''static void visit(struct TreeNode *p,int *last,int *found,int *best) {
-    if(!p) return; visit(p->left,last,found,best);
+    if(!p) return;
+    visit(p->left,last,found,best);
     if(*found && p->val-*last<*best) *best=p->val-*last;
     *last=p->val; *found=1; visit(p->right,last,found,best);
 }
@@ -145,6 +146,35 @@ wb_result_array(argv[2],out,list.count);free(out);wb_list_free(&list);wb_json_fr
         errors=(self.data/'runs'/report['id']/'compile.stderr.log').read_text()
         self.assertIn('solution-master.c:', errors)
         self.assertIn('error:', errors)
+
+    def test_cli_blocks_all_warnings_before_cases_in_both_modes(self):
+        pointer_comparison = '''int* inorderTraversal(struct TreeNode* root, int* returnSize) {
+    *returnSize = 0;
+    if (root >= 10) printf("must not execute\\n");
+    return NULL;
+}'''
+        unused_variable = ARRAY.replace('int sum=0;', 'int sum=0; int unused;')
+        for mode in ('debug', 'perf'):
+            for problem, source in ((94, pointer_comparison), (1480, unused_variable)):
+                with self.subTest(mode=mode, problem=problem):
+                    self.code(problem, source, 'warning')
+                    execution = subprocess.run([str(ROOT/'run-test.sh'), str(problem), 'warning', '--mode', mode, '--json-lines'], env=self.env, capture_output=True, text=True, timeout=40)
+                    events = [json.loads(line) for line in execution.stdout.splitlines()]
+                    report = next(event['run'] for event in events if event['type'] == 'done')
+                    self.assertEqual(execution.returncode, 1)
+                    self.assertEqual(report['status'], 'compile_error')
+                    self.assertIn('-Werror', report['command'])
+                    self.assertEqual(report['cases'], [])
+                    self.assertFalse(any(event['type'] == 'case' for event in events))
+                    self.assertFalse((self.data/'runs'/report['id']/'cases').exists())
+                    diagnostics = (self.data/'runs'/report['id']/'compile.stderr.log').read_text()
+                    self.assertIn('error:', diagnostics)
+                    self.assertIn('solution-warning.c:', diagnostics)
+            self.code(1480, ARRAY, 'warning')
+            execution, report = self.run_problem(1480, 'warning', '--mode', mode)
+            self.assertEqual(execution.returncode, 0)
+            self.assertEqual(report['status'], 'passed')
+            self.assertFalse(report['cached'])
 
     def test_full_command_round_trips_paths_with_spaces_and_json_has_no_ansi(self):
         self.data = self.data/'workspace with spaces'
