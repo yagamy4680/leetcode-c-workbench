@@ -43,9 +43,9 @@ test('tree diagrams use current request inputs, retain duplicate nodes and suppo
   const dotResponse=await request('/api/problems/94/tree','POST',body);
   assert.equal(dotResponse.status,200);assert.match(dotResponse.headers.get('content-disposition'),/attachment/);
   assert.match(await dotResponse.text(),/n2 -> n4 \[label="R"\]/);
-  const root=[1];for(let i=2;i<=9;i++)root.push(null,i);
+  const root=[1];for(let i=2;i<=17;i++)root.push(null,i);
   const preview=await(await request('/api/problems/94/tree','POST',{input:{root}})).json();
-  assert.equal(preview.height,9);assert.equal(preview.inline,false);assert.equal(preview.svg,null);
+  assert.equal(preview.height,17);assert.equal(preview.inline,false);assert.equal(preview.svg,null);
   assert.equal((await request('/api/problems/94/tree','POST',{input:{root:[1,null,null,2]}})).status,400);
   const nary=await(await request('/api/problems/589/tree','POST',{input:{root:[1,null,3,2,4,null,5,6]},format:'dot'})).text();
   assert.match(nary,/n1 -> n4/);

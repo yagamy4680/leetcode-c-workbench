@@ -39,7 +39,7 @@ async function harness(handler=()=>undefined) {
     throw new Error(`Unexpected request ${call.method} ${route}`);
   };
   w.eval(fs.readFileSync('web/test-case.js','utf8'));
-  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode,refresh,refreshExternalCode,openCaseForm,addPastedCase,saveAcceptance,renderProblems,previewBatch,commitBatch,activateTab,updateTreePreview,downloadTree};');
+  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode,refresh,refreshExternalCode,openCaseForm,addPastedCase,saveAcceptance,renderProblems,previewBatch,commitBatch,activateTab,updateTreePreview,downloadTree,downloadTreeInput};');
   await pause();await w.hooks.loadProblem(1480);
   return {w,calls,$:id=>w.document.getElementById(id),close:()=>w.close()};
 }
@@ -310,18 +310,18 @@ test('cancelling ZIP overwrite sends no commit and failed preview restores contr
 
 test('tree preview uses unsaved case data and downloads deep trees without embedding SVG',async()=>{
   const downloadAck=deferred();
-  const h=await harness(call=>call.route.endsWith('/tree')?(call.body.format==='preview'?response({kind:'binary',height:9,nodeCount:9,inline:false,svg:'<svg><text>must stay hidden</text></svg>'}):downloadAck.promise):undefined);
+  const h=await harness(call=>call.route.endsWith('/tree')?(call.body.format==='preview'?response({kind:'binary',height:17,nodeCount:17,inline:false,svg:'<svg><text>must stay hidden</text></svg>'}):downloadAck.promise):undefined);
   h.$('code').value='unsaved code';
   const draft=JSON.stringify([{id:'deep',input:{root:[1,null,2]},expected:[]}]);h.$('tests-json').value=draft;
   await h.w.hooks.updateTreePreview();
   assert.equal(h.$('tree-figure').hidden,true);assert.equal(h.$('tree-image').hasAttribute('src'),false);
-  assert.match(h.$('tree-status').textContent,/exceeds 8 levels/);assert.equal(h.$('tree-svg').disabled,false);
+  assert.match(h.$('tree-status').textContent,/exceeds 16 levels/);assert.equal(h.$('tree-svg').disabled,false);
   let downloaded;h.w.URL.createObjectURL=()=> 'blob:fixture';h.w.URL.revokeObjectURL=()=>{};
   h.w.HTMLAnchorElement.prototype.click=function(){downloaded=this.download;};
   const downloading=h.w.hooks.downloadTree('svg');
   assert.match(h.$('tree-status').textContent,/Preparing SVG download/);assert.equal(h.$('tree-svg').disabled,true);
   downloadAck.resolve(response('<svg xmlns="http://www.w3.org/2000/svg"/>'));await downloading;
-  assert.match(h.$('tree-status').textContent,/exceeds 8 levels/);
+  assert.match(h.$('tree-status').textContent,/exceeds 16 levels/);
   assert.equal(downloaded,'problem-1480-deep.svg');
   assert.deepEqual(h.calls.filter(c=>c.route.endsWith('/tree')).map(c=>c.body.format),['preview','svg']);
   assert.deepEqual(h.calls.find(c=>c.route.endsWith('/tree')).body.input,{root:[1,null,2]});
@@ -334,9 +334,9 @@ test('ordinary array test cases show a quiet unsupported state without rendering
   assert.equal(h.calls.filter(call=>call.route.endsWith('/tree')).length,0);assert.equal(h.$('tree-figure').hidden,true);h.close();
 });
 
-test('eight-level trees display while edited JSON clears stale images and ignores late responses',async()=>{
+test('sixteen-level trees display while edited JSON clears stale images and ignores late responses',async()=>{
   const slow=deferred();let request=0;
-  const h=await harness(call=>call.route.endsWith('/tree')?(++request===1?response({kind:'binary',height:8,nodeCount:8,inline:true,svg:'<svg/>'}):slow.promise):undefined);
+  const h=await harness(call=>call.route.endsWith('/tree')?(++request===1?response({kind:'binary',height:16,nodeCount:16,inline:true,svg:'<svg/>'}):slow.promise):undefined);
   h.$('tests-json').value='[{"id":"tree","input":{"root":[1]},"expected":1}]';
   await h.w.hooks.updateTreePreview();
   assert.equal(h.$('tree-figure').hidden,false);assert.match(h.$('tree-image').src,/data:image\/svg\+xml/);
@@ -357,4 +357,40 @@ test('missing renderer leaves DOT recovery available and switching problems disc
   const pending=h.w.hooks.updateTreePreview();await h.w.hooks.loadProblem(94);
   slow.resolve(response({kind:'binary',height:1,nodeCount:1,inline:true,svg:'<svg/>'}));await pending;
   assert.equal(h.$('tree-figure').hidden,true);assert.equal(h.$('tree-svg').disabled,true);h.close();
+});
+
+test('Input tree displays complete compact input at 2048 characters and downloads untruncated text above the limit',async()=>{
+  const h=await harness(call=>call.route.endsWith('/tree')?response({kind:'binary',height:1,nodeCount:1,inline:true,svg:'<svg/>'}):undefined);
+  const input={root:[1],note:''};input.note='x'.repeat(2048-JSON.stringify(input).length);
+  const exact=JSON.stringify(input);assert.equal(exact.length,2048);
+  h.$('tests-json').value=JSON.stringify([{id:'boundary',input,expected:1}]);
+  await h.w.hooks.updateTreePreview();
+  assert.equal(h.$('tree-input').hidden,false);assert.equal(h.$('tree-input-text').hidden,false);
+  assert.equal(h.$('tree-input-text').textContent,exact);assert.equal(h.$('tree-input-download').hidden,true);
+  input.note+='x';const complete=JSON.stringify(input);assert.equal(complete.length,2049);
+  h.$('tests-json').value=JSON.stringify([{id:'larger',input,expected:1}]);
+  await h.w.hooks.updateTreePreview();
+  assert.equal(h.$('tree-input-text').hidden,true);assert.equal(h.$('tree-input-text').textContent,'');
+  assert.equal(h.$('tree-input-download').hidden,false);assert.equal(h.$('tree-input-download').disabled,false);
+  assert.match(h.$('tree-input-info').textContent,/exceeds 2,048/);
+  let blob,filename;h.w.Blob=Blob;h.w.URL.createObjectURL=value=>{blob=value;return 'blob:text-fixture';};h.w.URL.revokeObjectURL=()=>{};
+  h.w.HTMLAnchorElement.prototype.click=function(){filename=this.download;};
+  h.$('tree-input-download').click();
+  assert.equal(filename,'problem-1480-larger-input.txt');assert.equal(blob.type,'text/plain;charset=utf-8');
+  assert.equal(await blob.text(),complete+'\n');assert.deepEqual(JSON.parse(await blob.text()),input);
+  h.$('tests-json').dispatchEvent(new h.w.Event('input'));
+  assert.equal(h.$('tree-input').hidden,true);assert.equal(h.$('tree-input-download').disabled,true);
+  h.close();
+});
+
+test('raw input preserves Unicode characters and HTML as text, and remains visible when rendering fails',async()=>{
+  const h=await harness(call=>call.route.endsWith('/tree')?response({kind:'binary',height:1,nodeCount:1,inline:true,svg:null,renderError:'Graphviz unavailable'}):undefined);
+  const input={root:[1],note:'😀'.repeat(1500)};
+  h.$('tests-json').value=JSON.stringify([{id:'unicode',input,expected:1}]);await h.w.hooks.updateTreePreview();
+  assert.equal(h.$('tree-input-text').hidden,false);assert.equal(h.$('tree-input-text').textContent,JSON.stringify(input));
+  input.note='</pre><script>window.injected=true</script>';
+  h.$('tests-json').value=JSON.stringify([{id:'html',input,expected:1}]);await h.w.hooks.updateTreePreview();
+  assert.equal(h.$('tree-input-text').textContent,JSON.stringify(input));assert.equal(h.$('tree-input').querySelector('script'),null);
+  assert.match(h.$('tree-error').textContent,/Graphviz unavailable/);assert.equal(h.$('tree-input').hidden,false);
+  await h.w.hooks.loadProblem(94);assert.equal(h.$('tree-input').hidden,true);assert.equal(h.$('tree-input-text').textContent,'');h.close();
 });

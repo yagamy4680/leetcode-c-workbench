@@ -134,6 +134,11 @@
               <button id="tree-svg" type="button" class="btn btn-sm btn-outline-secondary" disabled>Download SVG</button>
               <button id="tree-dot" type="button" class="btn btn-sm btn-outline-secondary" disabled>Download DOT</button>
             </div>
+            <div id="tree-input" class="tree-input" hidden>
+              <div class="tree-input-heading"><span id="tree-input-label">Original input (JSON)</span><button id="tree-input-download" type="button" class="btn btn-sm btn-outline-secondary" hidden disabled>Download input (.txt)</button></div>
+              <p id="tree-input-info" class="muted"></p>
+              <pre id="tree-input-text" tabindex="0" aria-labelledby="tree-input-label" hidden></pre>
+            </div>
             <p id="tree-status" class="muted" role="status" aria-live="polite">Select a case to visualize its root array.</p>
             <p id="tree-error" class="error-text" role="alert"></p>
             <figure id="tree-figure" class="tree-figure" hidden><img id="tree-image" alt=""><figcaption>Download SVG for the full-size diagram. L and R mark binary-tree child positions.</figcaption></figure>

@@ -39,12 +39,37 @@ function activateTab(tab) {
   if (tab === 'solution') syncEditorScroll();
   if (tab === 'tests') updateTreePreview();
 }
-let treeEpoch = 0, treeController = null, treeSnapshot = null;
+let treeEpoch = 0, treeController = null, treeSnapshot = null, treeInputSnapshot = null;
 function invalidateTree(message = '') {
-  ++treeEpoch; treeController?.abort(); treeSnapshot = null;
+  ++treeEpoch; treeController?.abort(); treeSnapshot = null; treeInputSnapshot = null;
   $('tree-figure').hidden = true; $('tree-image').removeAttribute('src');
+  $('tree-input').hidden = true; $('tree-input-text').textContent = '';
+  $('tree-input-download').hidden = true; $('tree-input-download').disabled = true;
   $('tree-svg').disabled = true; $('tree-dot').disabled = true;
   $('tree-status').textContent = message; $('tree-error').textContent = '';
+}
+function showTreeInput(problemId, testcase) {
+  const text = JSON.stringify(testcase.input);
+  if (text === undefined) return;
+  let characters = 0;
+  for (const character of text) { if (++characters > 2048) break; }
+  const oversized = characters > 2048;
+  treeInputSnapshot = { problemId, id: testcase.id, text };
+  $('tree-input').hidden = false; $('tree-input-text').hidden = oversized;
+  $('tree-input-text').textContent = oversized ? '' : text;
+  $('tree-input-info').textContent = oversized ? 'Input exceeds 2,048 characters. Download the complete input as text.' : '';
+  $('tree-input-download').hidden = !oversized; $('tree-input-download').disabled = !oversized;
+}
+function saveTreeDownload(blob, filename) {
+  const url = URL.createObjectURL(blob), link = document.createElement('a');
+  link.href = url; link.download = filename;
+  document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+function downloadTreeInput() {
+  if (!treeInputSnapshot) return;
+  const snapshot = treeInputSnapshot, caseId = snapshot.id.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64);
+  saveTreeDownload(new Blob([snapshot.text + '\n'], { type: 'text/plain;charset=utf-8' }), `problem-${snapshot.problemId}-${caseId}-input.txt`);
 }
 function syncTreeCases(tests, preferred = $('tree-case').value) {
   $('tree-case').innerHTML = tests.map(test => `<option value="${esc(test.id)}">${esc(test.id)}</option>`).join('');
@@ -59,6 +84,7 @@ async function updateTreePreview() {
     if (!Array.isArray(tests) || !tests.length || tests.some(test => !test || typeof test.id !== 'string')) throw new Error('Enter a JSON array of test cases with string IDs, then update the preview.');
     syncTreeCases(tests);
     const testcase = tests.find(test => test.id === $('tree-case').value);
+    showTreeInput(problemId, testcase);
     const kind = $('tree-kind').value, input = testcase.input;
     if (!input || !Object.hasOwn(input, 'root')) {
       $('tree-status').textContent = 'This case has no root field. Tree diagrams use input.root.'; return;
@@ -70,8 +96,8 @@ async function updateTreePreview() {
     treeSnapshot = { problemId, id: testcase.id, input, kind };
     $('tree-svg').disabled = false; $('tree-dot').disabled = false;
     const summary = `${preview.nodeCount.toLocaleString()} nodes · ${preview.height} level${preview.height === 1 ? '' : 's'}`;
-    $('tree-status').textContent = preview.height > 8 ? `${summary}. Tree exceeds 8 levels; preview hidden. Download the SVG to view it separately.` : !preview.inline ? `${summary}. More than 512 nodes; preview hidden. Download the SVG to view it separately.` : preview.nodeCount === 0 ? 'Empty tree (0 nodes, 0 levels).' : summary;
-    if (preview.svg && preview.inline && preview.height <= 8) {
+    $('tree-status').textContent = preview.height > 16 ? `${summary}. Tree exceeds 16 levels; preview hidden. Download the SVG to view it separately.` : !preview.inline ? `${summary}. More than 512 nodes; preview hidden. Download the SVG to view it separately.` : preview.nodeCount === 0 ? 'Empty tree (0 nodes, 0 levels).' : summary;
+    if (preview.svg && preview.inline && preview.height <= 16) {
       $('tree-image').alt = `${preview.kind === 'binary' ? 'Binary' : 'N-ary'} input tree for test case ${testcase.id}: ${summary}`;
       $('tree-image').src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(preview.svg);
       $('tree-figure').hidden = false;
@@ -94,10 +120,7 @@ async function downloadTree(format) {
     const response = await api(`/api/problems/${snapshot.problemId}/tree`, { method: 'POST', signal: treeController.signal, body: JSON.stringify({ input: snapshot.input, kind: snapshot.kind, format }) });
     const blob = await response.blob();
     if (epoch !== treeEpoch || treeSnapshot !== snapshot) return;
-    const url = URL.createObjectURL(blob), link = document.createElement('a');
-    link.href = url; link.download = `problem-${snapshot.problemId}-${snapshot.id.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64)}.${format}`;
-    document.body.append(link); link.click(); link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    saveTreeDownload(blob, `problem-${snapshot.problemId}-${snapshot.id.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64)}.${format}`);
   } catch (error) { if (epoch === treeEpoch && error.name !== 'AbortError') $('tree-error').textContent = error.message; }
   finally { if (epoch === treeEpoch && treeSnapshot === snapshot) { $('tree-svg').disabled = false; $('tree-dot').disabled = false; $('tree-status').textContent = previousStatus; } }
 }
@@ -471,6 +494,7 @@ bind('tree-case', 'change', updateTreePreview);
 bind('tree-kind', 'change', updateTreePreview);
 bind('tree-svg', 'click', () => downloadTree('svg'));
 bind('tree-dot', 'click', () => downloadTree('dot'));
+bind('tree-input-download', 'click', downloadTreeInput);
 bind('tests-json', 'input', () => invalidateTree('Test data changed. Update preview to use the current JSON.'));
 bind('case-cancel', 'click', () => { $('case-form').hidden = true; $('case-input').value = ''; $('case-expected').value = ''; $('add-case').focus(); });
 for (const id of ['case-input', 'case-expected']) bind(id, 'input', () => { $('case-size').textContent = `${$('case-input').value.length.toLocaleString()} input characters · ${$('case-expected').value.length.toLocaleString()} expected characters`; });

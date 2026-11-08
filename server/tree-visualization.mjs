@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { HttpError } from './workspace.mjs';
 
-export const INLINE_LEVELS = 8;
+export const INLINE_LEVELS = 16;
 export const INLINE_NODES = 512;
 export const MAX_TREE_NODES = 100000;
 export function treeKind(manifest, requested = 'auto') {

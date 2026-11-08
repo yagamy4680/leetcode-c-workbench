@@ -29,15 +29,17 @@ test('N-ary null-separated groups retain sibling order and empty child groups', 
   assert.deepEqual(tree.nodes[1].children, []); assert.deepEqual(tree.nodes[2].children, [4]);
 });
 
-test('eight levels render inline; nine levels never invoke Graphviz until explicit SVG download', async () => {
+test('sixteen levels render inline; seventeen levels never invoke Graphviz until explicit SVG download', async () => {
   let renders = 0; const renderer = async () => { ++renders; return '<svg/>'; };
-  for (const levels of [7,8]) {
+  for (const levels of [15,16]) {
     const result = await visualizeTree(binary, { input: { root: chain(levels) } }, renderer);
     assert.equal(result.height, levels); assert.equal(result.inline, true); assert.equal(result.svg, '<svg/>');
   }
+  const boundary = await visualizeTree(binary, { input: { root: chain(17) } }, renderer);
+  assert.equal(boundary.inline, false); assert.equal(boundary.svg, null); assert.equal(renders, 2);
   const deep = await visualizeTree(binary, { input: { root: chain(5001) } }, renderer);
   assert.equal(deep.height, 5001); assert.equal(deep.svg, null); assert.equal(deep.inline, false); assert.equal(renders, 2);
-  await visualizeTree(binary, { input: { root: chain(9) }, format: 'svg' }, renderer);
+  await visualizeTree(binary, { input: { root: chain(17) }, format: 'svg' }, renderer);
   assert.equal(renders, 3);
   const wide = await visualizeTree(nary, { input: { root: [0,null,...Array(1000).fill(1)] } }, renderer);
   assert.equal(wide.height, 2); assert.equal(wide.inline, false); assert.equal(renders, 3);

@@ -132,18 +132,21 @@ In **Test cases → Input tree**, select one case to draw its current `input.roo
 Binary trees use LeetCode's breadth-first array; N-ary trees use null-separated
 child groups. Auto uses the problem's C signature/tree headers; choose a format
 manually for custom drivers. Duplicate values keep separate nodes, and binary
-edges are labeled L/R. A root is level 1: trees with up to 8 levels display
+edges are labeled L/R. A root is level 1: trees with up to 16 levels display
 inline. Taller trees show their size and a download action without rendering
 an image on the page. Trees with more than 512 nodes also use downloads to keep
 wide diagrams from overwhelming the page. SVG and DOT downloads retain the
-complete tree rather than cropping it to eight levels.
+complete tree rather than cropping it to sixteen levels.
 
 SVG rendering requires local Graphviz: `brew install graphviz` on the Mac.
 If the service cannot find Homebrew executables, set `DOT=/opt/homebrew/bin/dot`
 in `.env` and restart it (use your actual executable path). DOT downloads work
 without Graphviz. No C compilation or LeetCode request is needed for diagrams.
 Editing the test JSON clears a stale diagram; **Update preview** reads the
-current unsaved JSON without saving it. New pasted cases become selectable
+current unsaved JSON without saving it. The selected case's complete input
+value is shown as compact JSON under Original input. Up to 2,048 Unicode
+characters display inline; longer input is omitted from the page and offered
+as a complete UTF-8 .txt download. New pasted cases become selectable
 after saving. Only the selected case is rendered. Diagrams support at most
 100,000 nodes/200,001 serialized entries; SVG rendering is limited to two
 concurrent processes, 15 seconds and 16 MiB. For larger or costly diagrams,

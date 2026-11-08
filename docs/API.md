@@ -126,13 +126,13 @@ auto recognizes TreeNode signatures and known tree headers. Unknown custom
 structures require an explicit kind. Only the named `root` field is supported.
 
 Preview returns `{kind,height,nodeCount,inline,svg,renderError?}`. A root has
-height 1 and an empty tree height 0. Up to eight levels and 512 nodes may render
+height 1 and an empty tree height 0. Up to sixteen levels and 512 nodes may render
 inline; taller/wider previews return metadata and null SVG without starting
 Graphviz. Missing Graphviz or a rendering failure leaves valid metadata and
 an explanatory renderError, so DOT download remains possible.
 
 Set format to `svg` or `dot` for a complete attachment, including levels beyond
-eight. SVG uses the local Graphviz executable (DOT environment setting, default
+sixteen. SVG uses the local Graphviz executable (DOT environment setting, default
 dot); DOT generation requires no renderer. Responses have `Cache-Control:
 no-store`. Malformed/unreachable tree data, unsupported formats, non-int32
 values and size violations return 400. Rendering errors/limits return 503 for
