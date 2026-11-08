@@ -11,6 +11,7 @@ import { createIndexer, syncProblem } from './indexer.mjs';
 
 import { createBatchImports } from './batch-import.mjs';
 import { createSourceEvents } from './source-events.mjs';
+import { visualizeTree } from './tree-visualization.mjs';
 
 export function auth(req, res, next) {
   const header = req.get('authorization') || '';
@@ -102,6 +103,19 @@ export async function createApp(db = createDatabaseClient()) {
     catch (error) { throw new HttpError(400, error.message, { validationErrors: error.validationErrors }); }
   });
   app.post('/api/imports/commit', async (req, res) => res.json(await batchImports.commit(req.body)));
+  app.post('/api/problems/:id/tree', async (req, res) => {
+    const dir = problemDir(req.params.id), manifest = readJSON(ownedFile(dir, 'manifest.json'));
+    // Legacy bundles reference shared tree headers from solution.h without
+    // listing those runtime headers in manifest.headers.
+    const header = fs.readFileSync(ownedFile(dir, 'solution.h'), 'utf8');
+    const treeHeaders = [...header.matchAll(/#include\s+"(wb_(?:tree|nary)(?:_types)?\.h)"/g)].map(match => match[1]);
+    const result = await visualizeTree({ ...manifest, headers: [...(manifest.headers ?? []), ...treeHeaders] }, req.body);
+    res.set('Cache-Control', 'no-store');
+    if (!req.body?.format || req.body.format === 'preview') return res.json(result);
+    const svg = req.body.format === 'svg';
+    res.set('Content-Disposition', `attachment; filename="problem-${manifest.id}-input-tree.${svg ? 'svg' : 'dot'}"`);
+    res.type(svg ? 'image/svg+xml' : 'text/vnd.graphviz').send(result);
+  });
   app.get('/api/health', (req, res) => res.json({ ok: true }));
   app.get('/api/doctor', async (req, res) => res.json(await runCommand(['doctor', ...(req.query.refresh === '1' ? ['--refresh'] : [])])));
   app.get('/api/problems', async (req, res) => {

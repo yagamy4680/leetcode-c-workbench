@@ -128,6 +128,27 @@ arrays/trees use scrollable text areas with no per-node preview. Errors preserve
 your pasted values. Save any existing JSON editor changes before adding a case.
 After saving, select the new case in **Run tests** to reproduce the failure.
 
+In **Test cases → Input tree**, select one case to draw its current `input.root`.
+Binary trees use LeetCode's breadth-first array; N-ary trees use null-separated
+child groups. Auto uses the problem's C signature/tree headers; choose a format
+manually for custom drivers. Duplicate values keep separate nodes, and binary
+edges are labeled L/R. A root is level 1: trees with up to 8 levels display
+inline. Taller trees show their size and a download action without rendering
+an image on the page. Trees with more than 512 nodes also use downloads to keep
+wide diagrams from overwhelming the page. SVG and DOT downloads retain the
+complete tree rather than cropping it to eight levels.
+
+SVG rendering requires local Graphviz: `brew install graphviz` on the Mac.
+If the service cannot find Homebrew executables, set `DOT=/opt/homebrew/bin/dot`
+in `.env` and restart it (use your actual executable path). DOT downloads work
+without Graphviz. No C compilation or LeetCode request is needed for diagrams.
+Editing the test JSON clears a stale diagram; **Update preview** reads the
+current unsaved JSON without saving it. New pasted cases become selectable
+after saving. Only the selected case is rendered. Diagrams support at most
+100,000 nodes/200,001 serialized entries; SVG rendering is limited to two
+concurrent processes, 15 seconds and 16 MiB. For larger or costly diagrams,
+download DOT and render it outside the workbench.
+
 ## Testing and debugging
 
 Debug mode uses GNU11, `-O1 -g`, warnings, ASan, UBSan, and frame pointers. Performance mode uses `-O2` with sanitizers disabled. Set `CC` to select a compiler; otherwise, the runner prefers `clang`, then `cc`. `CC` must be an executable path, without additional flags.

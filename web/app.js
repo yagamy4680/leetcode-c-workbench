@@ -37,6 +37,69 @@ function activateTab(tab) {
   document.querySelectorAll('[data-tab]').forEach(button => { const on = button.dataset.tab === tab; button.classList.toggle('active', on); if (on) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current'); });
   for (const name of ['solution', 'tests', 'description', 'history']) $(`${name}-tab`).hidden = name !== tab;
   if (tab === 'solution') syncEditorScroll();
+  if (tab === 'tests') updateTreePreview();
+}
+let treeEpoch = 0, treeController = null, treeSnapshot = null;
+function invalidateTree(message = '') {
+  ++treeEpoch; treeController?.abort(); treeSnapshot = null;
+  $('tree-figure').hidden = true; $('tree-image').removeAttribute('src');
+  $('tree-svg').disabled = true; $('tree-dot').disabled = true;
+  $('tree-status').textContent = message; $('tree-error').textContent = '';
+}
+function syncTreeCases(tests, preferred = $('tree-case').value) {
+  $('tree-case').innerHTML = tests.map(test => `<option value="${esc(test.id)}">${esc(test.id)}</option>`).join('');
+  if (tests.some(test => test.id === preferred)) $('tree-case').value = preferred;
+}
+async function updateTreePreview() {
+  if (!state.problem) return;
+  invalidateTree('Reading current test data…');
+  const epoch = treeEpoch, problemId = state.problem.id;
+  try {
+    const tests = JSON.parse($('tests-json').value);
+    if (!Array.isArray(tests) || !tests.length || tests.some(test => !test || typeof test.id !== 'string')) throw new Error('Enter a JSON array of test cases with string IDs, then update the preview.');
+    syncTreeCases(tests);
+    const testcase = tests.find(test => test.id === $('tree-case').value);
+    const kind = $('tree-kind').value, input = testcase.input;
+    if (!input || !Object.hasOwn(input, 'root')) {
+      $('tree-status').textContent = 'This case has no root field. Tree diagrams use input.root.'; return;
+    }
+    treeController = new AbortController();
+    $('tree-status').textContent = 'Rendering input tree…';
+    const preview = await (await api(`/api/problems/${problemId}/tree`, { method: 'POST', signal: treeController.signal, body: JSON.stringify({ input, kind, format: 'preview' }) })).json();
+    if (epoch !== treeEpoch || state.problem.id !== problemId) return;
+    treeSnapshot = { problemId, id: testcase.id, input, kind };
+    $('tree-svg').disabled = false; $('tree-dot').disabled = false;
+    const summary = `${preview.nodeCount.toLocaleString()} nodes · ${preview.height} level${preview.height === 1 ? '' : 's'}`;
+    $('tree-status').textContent = preview.height > 8 ? `${summary}. Tree exceeds 8 levels; preview hidden. Download the SVG to view it separately.` : !preview.inline ? `${summary}. More than 512 nodes; preview hidden. Download the SVG to view it separately.` : preview.nodeCount === 0 ? 'Empty tree (0 nodes, 0 levels).' : summary;
+    if (preview.svg && preview.inline && preview.height <= 8) {
+      $('tree-image').alt = `${preview.kind === 'binary' ? 'Binary' : 'N-ary'} input tree for test case ${testcase.id}: ${summary}`;
+      $('tree-image').src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(preview.svg);
+      $('tree-figure').hidden = false;
+    }
+    $('tree-error').textContent = preview.renderError || '';
+  } catch (error) {
+    if (epoch !== treeEpoch || error.name === 'AbortError') return;
+    if (error.details?.code === 'tree_format_unknown') $('tree-status').textContent = error.message;
+    else { $('tree-status').textContent = 'No diagram available.'; $('tree-error').textContent = error.message; }
+  }
+}
+async function downloadTree(format) {
+  if (!treeSnapshot) return;
+  const snapshot = treeSnapshot, epoch = treeEpoch;
+  const previousStatus = $('tree-status').textContent;
+  treeController?.abort(); treeController = new AbortController();
+  $('tree-svg').disabled = true; $('tree-dot').disabled = true; $('tree-error').textContent = '';
+  $('tree-status').textContent = `Preparing ${format.toUpperCase()} download…`;
+  try {
+    const response = await api(`/api/problems/${snapshot.problemId}/tree`, { method: 'POST', signal: treeController.signal, body: JSON.stringify({ input: snapshot.input, kind: snapshot.kind, format }) });
+    const blob = await response.blob();
+    if (epoch !== treeEpoch || treeSnapshot !== snapshot) return;
+    const url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url; link.download = `problem-${snapshot.problemId}-${snapshot.id.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64)}.${format}`;
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch (error) { if (epoch === treeEpoch && error.name !== 'AbortError') $('tree-error').textContent = error.message; }
+  finally { if (epoch === treeEpoch && treeSnapshot === snapshot) { $('tree-svg').disabled = false; $('tree-dot').disabled = false; $('tree-status').textContent = previousStatus; } }
 }
 function renderProblems() {
   const items = state.problems;
@@ -188,7 +251,7 @@ async function refreshExternalCode() {
   if (state.report) showReport(state.report);
   notice('Solution updated from disk.');
 }
-window.addEventListener('pagehide', () => { sourceEvents?.close(); clearTimeout(sourceRefreshTimer); });
+window.addEventListener('pagehide', () => { sourceEvents?.close(); clearTimeout(sourceRefreshTimer); ++treeEpoch; treeController?.abort(); });
 window.addEventListener('pageshow', event => { if (event.persisted) { sourceEventsKey = ''; connectSourceEvents(); } });
 async function loadCode(variant = state.variant, epoch = ++state.viewEpoch) {
   const id = state.problem.id; state.loading = true;
@@ -220,9 +283,11 @@ async function loadProblem(id, keepTab = false, discardConfirmed = false) {
   $('variant').innerHTML = p.solutions.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
   applyCode(code, variant);
   state.savedTests = JSON.stringify(p.tests, null, 2); $('tests-json').value = state.savedTests; state.testsHash = p.testsHash;
+  invalidateTree('Select a case to visualize its root array.'); syncTreeCases(p.tests);
   $('case-select').innerHTML = '<option value="">All cases</option>' + p.tests.map(t => `<option>${esc(t.id)}</option>`).join('');
   state.report = null; $('case-results').innerHTML = ''; $('diagnostics').innerHTML = ''; $('run-summary').textContent = 'Save and run with ⌘/Ctrl Enter.'; $('run-state').textContent = 'Ready'; $('tested-code').hidden = true;
   renderHistory(); renderProblems(); if (!keepTab) activateTab('solution');
+  if (keepTab && !$('tests-tab').hidden) updateTreePreview();
   } finally { if (epoch === state.viewEpoch) state.loading = false; }
 }
 async function saveCode() {
@@ -245,7 +310,7 @@ async function saveTests() {
     const result = await json(`/api/problems/${id}/tests`, 'PUT', { tests, expectedHash });
     if (state.problem.id === id) { state.testsHash = result.hash; state.savedTests = submitted; state.problem.tests = tests; $('case-select').innerHTML = '<option value="">All cases</option>' + tests.map(t => `<option>${esc(t.id)}</option>`).join(''); notice(testsDirty() ? 'Submitted test cases saved; newer edits remain unsaved.' : 'Test cases saved.'); }
   })();
-  try { await state.savingTests; } finally { state.savingTests = null; }
+  try { await state.savingTests; if (!$('tests-tab').hidden) updateTreePreview(); } finally { state.savingTests = null; }
 }
 function caseFormDirty() { return !$('case-form').hidden && Boolean($('case-input').value || $('case-expected').value); }
 function openCaseForm() {
@@ -285,6 +350,7 @@ async function addPastedCase(event) {
     if ($('tests-json').value === before) $('tests-json').value = state.savedTests;
     $('case-select').innerHTML = '<option value="">All cases</option>' + appended.map(test => `<option>${esc(test.id)}</option>`).join('');
     $('case-form').hidden = true; $('case-input').value = ''; $('case-expected').value = '';
+    syncTreeCases(appended, id); if (!$('tests-tab').hidden) updateTreePreview();
     notice(`Test case ${id} saved. Select it in Run tests to reproduce the failure.`); $('add-case').focus();
   } catch (error) { $('case-error').textContent = error.message; }
   finally {
@@ -400,6 +466,12 @@ bind('clone-form', 'submit', async e => { e.preventDefault(); if (navigationBusy
 bind('save-tests', 'click', saveTests);
 bind('add-case', 'click', openCaseForm);
 bind('case-form', 'submit', addPastedCase);
+bind('tree-update', 'click', updateTreePreview);
+bind('tree-case', 'change', updateTreePreview);
+bind('tree-kind', 'change', updateTreePreview);
+bind('tree-svg', 'click', () => downloadTree('svg'));
+bind('tree-dot', 'click', () => downloadTree('dot'));
+bind('tests-json', 'input', () => invalidateTree('Test data changed. Update preview to use the current JSON.'));
 bind('case-cancel', 'click', () => { $('case-form').hidden = true; $('case-input').value = ''; $('case-expected').value = ''; $('add-case').focus(); });
 for (const id of ['case-input', 'case-expected']) bind(id, 'input', () => { $('case-size').textContent = `${$('case-input').value.length.toLocaleString()} input characters · ${$('case-expected').value.length.toLocaleString()} expected characters`; });
 bind('log-source', 'change', showLog); bind('log-stream', 'change', showLog);

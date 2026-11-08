@@ -125,6 +125,19 @@
             <p id="case-error" class="error-text" role="alert"></p>
             <div class="case-actions"><button id="case-submit" type="submit" class="btn btn-primary">Save new test case</button><button id="case-cancel" type="button" class="btn btn-outline-secondary">Cancel</button></div>
           </form>
+          <section class="tree-visualization" aria-labelledby="tree-title">
+            <h4 id="tree-title">Input tree</h4>
+            <div class="tree-toolbar">
+              <div><label for="tree-case">Test case</label><select id="tree-case" class="form-select form-select-sm"></select></div>
+              <div><label for="tree-kind">Tree format</label><select id="tree-kind" class="form-select form-select-sm"><option value="auto">Auto from problem</option><option value="binary">Binary tree</option><option value="nary">N-ary tree</option></select></div>
+              <button id="tree-update" type="button" class="btn btn-sm btn-outline-primary">Update preview</button>
+              <button id="tree-svg" type="button" class="btn btn-sm btn-outline-secondary" disabled>Download SVG</button>
+              <button id="tree-dot" type="button" class="btn btn-sm btn-outline-secondary" disabled>Download DOT</button>
+            </div>
+            <p id="tree-status" class="muted" role="status" aria-live="polite">Select a case to visualize its root array.</p>
+            <p id="tree-error" class="error-text" role="alert"></p>
+            <figure id="tree-figure" class="tree-figure" hidden><img id="tree-image" alt=""><figcaption>Download SVG for the full-size diagram. L and R mark binary-tree child positions.</figcaption></figure>
+          </section>
           <label for="tests-json">Test data (JSON)</label><textarea id="tests-json" class="form-control json-editor" spellcheck="false"></textarea>
         </section>
         <article id="description-tab" class="tab-panel prose" hidden><div id="description-body"></div><section id="similar-questions" hidden aria-labelledby="similar-title"><h2 id="similar-title">Similar questions</h2><ul id="similar-list"></ul></section></article>

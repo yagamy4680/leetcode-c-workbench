@@ -19,6 +19,7 @@ All endpoints require HTTP Basic Auth, including static files. Use HTTPS at `lee
 | POST | `/api/problems/:id/solutions` | Clone `{name, from}`; from defaults to master |
 | POST | `/api/problems/:id/tests` | Append `{test, expectedHash}` without replacing prior cases |
 | PUT | `/api/problems/:id/tests` | Save `{tests, expectedHash}` |
+| POST | `/api/problems/:id/tree` | Preview current `{input, kind?, format?}` or download SVG/DOT |
 | POST | `/api/problems/:id/run` | NDJSON event stream |
 | GET | `/api/runs/:runId` | Complete run report |
 | GET | `/api/runs/:runId/source` | Exact tested solution source |
@@ -114,6 +115,30 @@ curl --netrc-file ~/.netrc-workbench \
   --data-binary @/tmp/problem-1480.json \
   https://leetcode.myab.cc/api/problems
 ```
+
+## Input tree diagrams
+
+`POST /api/problems/:id/tree` accepts `{input:{root:[2,2,5,null,null,5,7]},
+kind:"auto",format:"preview"}`. It is read-only and uses normal authentication
+and origin protection. It reads the submitted input, including unsaved browser
+edits, rather than changing tests or solutions. `kind` is auto, binary or nary;
+auto recognizes TreeNode signatures and known tree headers. Unknown custom
+structures require an explicit kind. Only the named `root` field is supported.
+
+Preview returns `{kind,height,nodeCount,inline,svg,renderError?}`. A root has
+height 1 and an empty tree height 0. Up to eight levels and 512 nodes may render
+inline; taller/wider previews return metadata and null SVG without starting
+Graphviz. Missing Graphviz or a rendering failure leaves valid metadata and
+an explanatory renderError, so DOT download remains possible.
+
+Set format to `svg` or `dot` for a complete attachment, including levels beyond
+eight. SVG uses the local Graphviz executable (DOT environment setting, default
+dot); DOT generation requires no renderer. Responses have `Cache-Control:
+no-store`. Malformed/unreachable tree data, unsupported formats, non-int32
+values and size violations return 400. Rendering errors/limits return 503 for
+SVG downloads. Limits: 100000 nodes, 200001 serialized entries, two concurrent
+renderers, 15 seconds and 16 MiB SVG output. DOT is generated only from checked
+numeric tree data; this API does not accept arbitrary Graphviz source or paths.
 
 ## Run stream
 

@@ -20,7 +20,7 @@ function response(value) { return new Response(typeof value==='string'?value:JSO
 async function harness(handler=()=>undefined) {
   const dom=new JSDOM(html,{runScripts:'outside-only',url:'http://127.0.0.1:3089/'}),w=dom.window,calls=[];
   w.marked=marked;w.DOMPurify=createDOMPurify(w);w.confirm=()=>true;w.Prism=Prism;
-  w.TextDecoder=TextDecoder;w.TextEncoder=TextEncoder;
+  w.TextDecoder=TextDecoder;w.TextEncoder=TextEncoder;w.AbortController=AbortController;
   w.EventSource=class {
     static instances=[];
     constructor(url){this.url=url;w.EventSource.instances.push(this);}
@@ -39,7 +39,7 @@ async function harness(handler=()=>undefined) {
     throw new Error(`Unexpected request ${call.method} ${route}`);
   };
   w.eval(fs.readFileSync('web/test-case.js','utf8'));
-  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode,refreshExternalCode,openCaseForm,addPastedCase,refresh,saveAcceptance,renderProblems,previewBatch,commitBatch};');
+  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode,refresh,refreshExternalCode,openCaseForm,addPastedCase,saveAcceptance,renderProblems,previewBatch,commitBatch,activateTab,updateTreePreview,downloadTree};');
   await pause();await w.hooks.loadProblem(1480);
   return {w,calls,$:id=>w.document.getElementById(id),close:()=>w.close()};
 }
@@ -306,4 +306,55 @@ test('cancelling ZIP overwrite sends no commit and failed preview restores contr
   const failure=await harness(call=>call.route==='/api/imports/preview'?new Response(JSON.stringify({error:'Invalid ZIP'}),{status:400}):undefined);
   Object.defineProperty(failure.$('batch-file'),'files',{value:[new failure.w.File(['invalid'],'problems.zip')]});await failure.w.hooks.previewBatch();
   assert.match(failure.$('batch-error').textContent,/Invalid ZIP/);assert.equal(failure.$('batch-file').disabled,false);assert.equal(failure.w.hooks.state.preparing,false);failure.close();
+});
+
+test('tree preview uses unsaved case data and downloads deep trees without embedding SVG',async()=>{
+  const downloadAck=deferred();
+  const h=await harness(call=>call.route.endsWith('/tree')?(call.body.format==='preview'?response({kind:'binary',height:9,nodeCount:9,inline:false,svg:'<svg><text>must stay hidden</text></svg>'}):downloadAck.promise):undefined);
+  h.$('code').value='unsaved code';
+  const draft=JSON.stringify([{id:'deep',input:{root:[1,null,2]},expected:[]}]);h.$('tests-json').value=draft;
+  await h.w.hooks.updateTreePreview();
+  assert.equal(h.$('tree-figure').hidden,true);assert.equal(h.$('tree-image').hasAttribute('src'),false);
+  assert.match(h.$('tree-status').textContent,/exceeds 8 levels/);assert.equal(h.$('tree-svg').disabled,false);
+  let downloaded;h.w.URL.createObjectURL=()=> 'blob:fixture';h.w.URL.revokeObjectURL=()=>{};
+  h.w.HTMLAnchorElement.prototype.click=function(){downloaded=this.download;};
+  const downloading=h.w.hooks.downloadTree('svg');
+  assert.match(h.$('tree-status').textContent,/Preparing SVG download/);assert.equal(h.$('tree-svg').disabled,true);
+  downloadAck.resolve(response('<svg xmlns="http://www.w3.org/2000/svg"/>'));await downloading;
+  assert.match(h.$('tree-status').textContent,/exceeds 8 levels/);
+  assert.equal(downloaded,'problem-1480-deep.svg');
+  assert.deepEqual(h.calls.filter(c=>c.route.endsWith('/tree')).map(c=>c.body.format),['preview','svg']);
+  assert.deepEqual(h.calls.find(c=>c.route.endsWith('/tree')).body.input,{root:[1,null,2]});
+  assert.equal(h.$('tests-json').value,draft);assert.equal(h.$('code').value,'unsaved code');h.close();
+});
+
+test('ordinary array test cases show a quiet unsupported state without rendering requests',async()=>{
+  const h=await harness();h.w.hooks.activateTab('tests');await pause();
+  assert.match(h.$('tree-status').textContent,/no root field/);assert.equal(h.$('tree-error').textContent,'');
+  assert.equal(h.calls.filter(call=>call.route.endsWith('/tree')).length,0);assert.equal(h.$('tree-figure').hidden,true);h.close();
+});
+
+test('eight-level trees display while edited JSON clears stale images and ignores late responses',async()=>{
+  const slow=deferred();let request=0;
+  const h=await harness(call=>call.route.endsWith('/tree')?(++request===1?response({kind:'binary',height:8,nodeCount:8,inline:true,svg:'<svg/>'}):slow.promise):undefined);
+  h.$('tests-json').value='[{"id":"tree","input":{"root":[1]},"expected":1}]';
+  await h.w.hooks.updateTreePreview();
+  assert.equal(h.$('tree-figure').hidden,false);assert.match(h.$('tree-image').src,/data:image\/svg\+xml/);
+  const pending=h.w.hooks.updateTreePreview();
+  h.$('tests-json').value='invalid JSON';h.$('tests-json').dispatchEvent(new h.w.Event('input'));
+  slow.resolve(response({kind:'binary',height:1,nodeCount:1,inline:true,svg:'<svg/>'}));await pending;
+  assert.equal(h.$('tree-figure').hidden,true);assert.equal(h.$('tree-svg').disabled,true);
+  assert.match(h.$('tree-status').textContent,/Test data changed/);
+  await h.w.hooks.updateTreePreview();assert.ok(h.$('tree-error').textContent);assert.equal(h.$('tests-json').value,'invalid JSON');h.close();
+});
+
+test('missing renderer leaves DOT recovery available and switching problems discards stale previews',async()=>{
+  const slow=deferred();let request=0;
+  const h=await harness(call=>call.route.endsWith('/tree')?(++request===1?response({kind:'nary',height:2,nodeCount:3,inline:true,svg:null,renderError:'Install Graphviz with brew install graphviz.'}):slow.promise):undefined);
+  h.$('tests-json').value='[{"id":"tree","input":{"root":[1,null,2,3]},"expected":[]}]';
+  await h.w.hooks.updateTreePreview();assert.match(h.$('tree-error').textContent,/brew install graphviz/);
+  assert.equal(h.$('tree-dot').disabled,false);assert.equal(h.$('tree-figure').hidden,true);
+  const pending=h.w.hooks.updateTreePreview();await h.w.hooks.loadProblem(94);
+  slow.resolve(response({kind:'binary',height:1,nodeCount:1,inline:true,svg:'<svg/>'}));await pending;
+  assert.equal(h.$('tree-figure').hidden,true);assert.equal(h.$('tree-svg').disabled,true);h.close();
 });

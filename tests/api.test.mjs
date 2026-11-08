@@ -36,6 +36,20 @@ test('all application endpoints require authentication',async()=>{
   assert.equal((await request('/api/health')).status,200);
   for(const file of ['/','/app.js','/style.css','/utilities.css','/vendor/bootstrap.css','/vendor/marked.js','/vendor/purify.js','/vendor/prism-core.js','/vendor/prism-clike.js','/vendor/prism-c.js']) assert.equal((await request(file)).status,200,file);
 });
+test('tree diagrams use current request inputs, retain duplicate nodes and support protected downloads',async()=>{
+  assert.equal((await fetch(base+'/api/problems/94/tree',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input:{root:[1]}})})).status,401);
+  assert.equal((await request('/api/problems/94/tree','POST',{input:{root:[1]}},{Origin:'https://untrusted.example'})).status,403);
+  const body={input:{root:[2,2,5,null,null,5,7]},format:'dot'};
+  const dotResponse=await request('/api/problems/94/tree','POST',body);
+  assert.equal(dotResponse.status,200);assert.match(dotResponse.headers.get('content-disposition'),/attachment/);
+  assert.match(await dotResponse.text(),/n2 -> n4 \[label="R"\]/);
+  const root=[1];for(let i=2;i<=9;i++)root.push(null,i);
+  const preview=await(await request('/api/problems/94/tree','POST',{input:{root}})).json();
+  assert.equal(preview.height,9);assert.equal(preview.inline,false);assert.equal(preview.svg,null);
+  assert.equal((await request('/api/problems/94/tree','POST',{input:{root:[1,null,null,2]}})).status,400);
+  const nary=await(await request('/api/problems/589/tree','POST',{input:{root:[1,null,3,2,4,null,5,6]},format:'dot'})).text();
+  assert.match(nary,/n1 -> n4/);
+});
 test('source edits preserve local changes with compare-and-swap',async()=>{
   const current=await(await request('/api/problems/1480/solutions/master')).json();
   assert.equal((await request('/api/problems/1480/solutions/master','PUT',{code:good})).status,428);
