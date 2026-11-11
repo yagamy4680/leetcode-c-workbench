@@ -166,6 +166,12 @@ flags invalidates older cached builds automatically.
 
 Each test case runs in a separate C process with a timeout, process-group cleanup, and bounded logs. A crashing case does not prevent later cases from running. The runner compiles once and reuses the binary across cases. Changes to code, headers, helpers, compiler, or flags trigger rebuilding; changing only tests does not.
 
+Process-group cleanup ignores a missing group and, after confirming the direct
+child has exited, `EPERM` from macOS cleanup. These post-exit cleanup errors do
+not replace the original exit status or sanitizer diagnostics: the runner
+records the failed case and continues with later cases. A permission failure
+while the child is still running remains an error.
+
 ```json
 [
   {

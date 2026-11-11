@@ -1,6 +1,7 @@
 import importlib.util
 import argparse
 import contextlib
+import errno
 import io
 import json
 import os
@@ -10,7 +11,7 @@ import shlex
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('workbench', ROOT / 'runner/workbench.py')
@@ -105,6 +106,23 @@ os.write(2, b'final tail')
         code, reason, duration = self.execute("import subprocess, sys\nsubprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])")
         self.assertEqual((code, reason), (0, None))
         self.assertLess(duration, 2000)
+
+    def test_cleanup_eperm_after_exit_preserves_code_and_diagnostics(self):
+        with patch.object(wb.os, 'killpg', side_effect=PermissionError(errno.EPERM, 'Operation not permitted')):
+            code, reason, _ = self.execute("import os\nos.write(2, b'runtime error: null pointer\\nfinal diagnostic')\nos._exit(1)")
+        self.assertEqual((code, reason), (1, None))
+        self.assertEqual([event['text'] for event in self.events],
+                         ['runtime error: null pointer\n', 'final diagnostic'])
+        self.assertEqual((self.folder / 'run.stderr.log').read_bytes(),
+                         b'runtime error: null pointer\nfinal diagnostic')
+
+    def test_cleanup_eperm_does_not_hide_permission_failure_for_a_live_process(self):
+        proc = Mock(pid=12345)
+        proc.poll.return_value = None
+        with patch.object(wb.os, 'killpg', side_effect=PermissionError(errno.EPERM, 'Operation not permitted')):
+            with self.assertRaises(PermissionError):
+                wb.kill_process_group(proc)
+        proc.poll.assert_called_once_with()
 
     def test_console_timestamps_stream_colors_and_plain_json_events(self):
         args = argparse.Namespace(json_lines=False)
@@ -321,6 +339,29 @@ wb_result_array(argv[2],out,list.count);free(out);wb_list_free(&list);wb_json_fr
         self.code(1480, 'int* runningSum(int* a,int n,int* s) { volatile int x=INT_MAX; a[0]=x+1; *s=n; return a; }')
         _, report = self.run_problem(1480,'master','--case','single')
         self.assertEqual(report['cases'][0]['status'],'undefined_behavior')
+
+    def test_null_nary_root_and_cleanup_eperm_keep_failure_report_and_next_case(self):
+        self.code(589, '''int* preorder(struct Node* root, int* size) {
+    int value = root->val;
+    int *result = malloc(sizeof(int));
+    if (!result) abort();
+    result[0] = value; *size = 1; return result;
+}''')
+        wb.write_json(self.data/'problems/589/tests.json', [
+            {'id': 'empty-root', 'input': {'root': []}, 'expected': []},
+            {'id': 'next', 'input': {'root': [7]}, 'expected': [7]}])
+        args = argparse.Namespace(problem=589, solution='master', case=None, mode='debug', json_lines=True)
+        output = io.StringIO()
+        with patch.object(wb.os, 'killpg', side_effect=PermissionError(errno.EPERM, 'Operation not permitted')), contextlib.redirect_stdout(output):
+            report = wb.run(self.data, args)
+        self.assertEqual(report['status'], 'failed')
+        self.assertEqual([case['status'] for case in report['cases']], ['undefined_behavior', 'passed'])
+        folder = self.data/'runs'/report['id']
+        self.assertEqual(wb.read_json(folder/'result.json'), report)
+        self.assertIn('member access within null pointer', (folder/'cases/empty-root/run.stderr.log').read_text())
+        events = [json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertEqual(events[-1]['type'], 'done')
+        self.assertEqual(events[-1]['run']['passed'], 1)
 
     def test_timeout_does_not_block_other_cases(self):
         self.code(1480, 'int* runningSum(int* a,int n,int* s) { if(a[0]==1)for(;;){} *s=n; return a; }')

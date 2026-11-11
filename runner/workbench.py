@@ -179,6 +179,18 @@ def emit(args, event):
         print(f'{run["status"]}: {run["passed"]}/{run["total"]} · {run["durationMs"]} ms · run {run["id"]}', flush=True)
 
 
+def kill_process_group(proc):
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    except PermissionError:
+        # macOS can return EPERM for an exited or zombie-only process group.
+        # Reap the direct child and preserve its result; live permission failures still matter.
+        if proc.poll() is None:
+            raise
+
+
 def execute(command, cwd, stem, timeout, env, args, case=None):
     """Read both pipes as they become ready and forward complete lines immediately."""
     out, err = cwd / f'{stem}.stdout.log', cwd / f'{stem}.stderr.log'
@@ -191,12 +203,6 @@ def execute(command, cwd, stem, timeout, env, args, case=None):
         emit(args, {'type': 'log', 'stream': stream, 'case': case,
                     'timestamp': dt.datetime.now().astimezone().isoformat(timespec='milliseconds'),
                     'text': line.decode('utf-8', errors='replace')})
-
-    def kill_group():
-        try:
-            os.killpg(proc.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
 
     def close_pipe(key):
         if key.data['pending']:
@@ -215,11 +221,11 @@ def execute(command, cwd, stem, timeout, env, args, case=None):
                 if not stopped:
                     if proc.poll() is not None:
                         # Close inherited pipes held by any surviving descendants.
-                        kill_group()
+                        kill_process_group(proc)
                         stopped = True
                     elif time.monotonic() - started >= timeout:
                         reason = 'timeout'
-                        kill_group()
+                        kill_process_group(proc)
                         proc.wait()
                         stopped = True
                 wait = 0 if stopped else max(0, min(0.05, timeout - (time.monotonic() - started)))
@@ -250,7 +256,7 @@ def execute(command, cwd, stem, timeout, env, args, case=None):
                             forward(state['stream'], line + b'\n')
                     if len(kept) < len(chunk):
                         reason = reason or 'output_limit'
-                        kill_group()
+                        kill_process_group(proc)
                         proc.wait()
                         stopped = True
                         # Do not keep draining a detached writer after the byte budget is spent.
@@ -259,11 +265,13 @@ def execute(command, cwd, stem, timeout, env, args, case=None):
                         break
             proc.wait()
         finally:
-            kill_group()
-            if proc.poll() is None:
-                proc.wait()
-            proc.stdout.close()
-            proc.stderr.close()
+            try:
+                kill_process_group(proc)
+                if proc.poll() is None:
+                    proc.wait()
+            finally:
+                proc.stdout.close()
+                proc.stderr.close()
     return proc.returncode, reason, round((time.monotonic() - started) * 1000)
 
 
