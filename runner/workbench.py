@@ -248,11 +248,15 @@ def execute(command, cwd, stem, timeout, env, args, case=None):
                         state['pending'] = lines.pop()
                         for line in lines:
                             forward(state['stream'], line + b'\n')
-                    if len(kept) < len(chunk) and reason is None:
-                        reason = 'output_limit'
+                    if len(kept) < len(chunk):
+                        reason = reason or 'output_limit'
                         kill_group()
                         proc.wait()
                         stopped = True
+                        # Do not keep draining a detached writer after the byte budget is spent.
+                        for pending in list(selector.get_map().values()):
+                            close_pipe(pending)
+                        break
             proc.wait()
         finally:
             kill_group()
