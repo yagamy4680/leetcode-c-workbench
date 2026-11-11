@@ -43,6 +43,16 @@ Problems live in `$WB_DATA_DIR/problems/<id>/`. Edit `solution-master.c` with yo
 
 Names such as `master` and `non-recursive` identify solution files, not Git branches. Use **New variant** in the web interface or copy a solution to `solution-<name>.c` in the problem directory.
 
+At the end of each CLI run, a compact case summary lists every executed case ID
+and its status without repeating input, expected output, or logs. Passed cases
+are green and failed cases are red on a terminal, with the usual `NO_COLOR` and
+`FORCE_COLOR` overrides. Each failed case also gets a command to rerun it from
+the application directory, preserving the solution variant and debug/performance
+mode, for example `./run-test.sh 429 queue-opt --case empty --mode debug`.
+The aggregate result, such as `failed: 13/17`, stays on the final line. Compile
+errors explicitly report that no cases ran. `--json-lines` keeps its structured
+events without adding console summary text.
+
 You can also use `make run PROBLEM=589 SOLUTION=non-recursive MODE=debug`. Run `make help` for other entry points.
 
 While the web server is running, changes to the selected `solution-*.c` file are pushed to the browser through an authenticated SSE connection. The server watches the containing directory to handle atomic editor saves and checks once per second as a fallback. A clean editor updates automatically, retaining its selection and scroll position. Unsaved browser edits are preserved with a disk-change warning; copy them before choosing **Reload from disk**. Updates arriving during saving, loading, testing, or snapshot preparation are deferred. Reconnection checks the current disk hash again.

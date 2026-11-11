@@ -176,6 +176,22 @@ def emit(args, event):
         print(event['text'], flush=True)
     elif event['type'] == 'done':
         run = event['run']
+        if run['cases']:
+            print('\nCase summary:', flush=True)
+            colored = color_enabled()
+            for case in run['cases']:
+                text = f'  [{case["status"]}] {case["id"]}'
+                color = '32' if case['status'] == 'passed' else '31'
+                print(f'\033[{color}m{text}\033[0m' if colored else text, flush=True)
+            failed = [case for case in run['cases'] if case['status'] != 'passed']
+            if failed:
+                print('\nRerun failed cases:', flush=True)
+                for case in failed:
+                    command = ['./run-test.sh', str(run['problemId']), run['solution'],
+                               '--case', case['id'], '--mode', run['mode']]
+                    print('  ' + shlex.join(command), flush=True)
+        elif run['status'] == 'compile_error':
+            print('No test cases ran because compilation failed.', flush=True)
         print(f'{run["status"]}: {run["passed"]}/{run["total"]} · {run["durationMs"]} ms · run {run["id"]}', flush=True)
 
 

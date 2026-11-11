@@ -263,6 +263,38 @@ wb_result_array(argv[2],out,list.count);free(out);wb_list_free(&list);wb_json_fr
         _, report = self.run_problem()
         self.assertEqual(report['status'], 'passed')
 
+    def test_cli_summary_survives_large_output_and_failed_case_command_is_runnable(self):
+        self.code(1480, ARRAY.replace('printf(', 'for (int i=0; i<2000; ++i) puts("verbose trace"); printf('), 'queue-opt')
+        wb.write_json(self.data/'problems/1480/tests.json', [
+            {'id': 'example1', 'input': {'nums': [1]}, 'expected': [1]},
+            {'id': 'bad-output', 'input': {'nums': [2]}, 'expected': [3]}])
+        command = [str(ROOT/'run-test.sh'), '1480', 'queue-opt', '--mode', 'perf']
+        env = {**self.env, 'NO_COLOR': '1'}
+        result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True, timeout=40)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertGreater(result.stdout.count('verbose trace'), 3000)
+        summary = result.stdout.split('\nCase summary:\n', 1)[1]
+        self.assertIn('[passed] example1', summary)
+        self.assertIn('[wrong_answer] bad-output', summary)
+        self.assertNotIn('verbose trace', summary)
+        self.assertNotIn('input:', summary)
+        self.assertNotIn('expected:', summary)
+        self.assertNotIn('actual:', summary)
+        self.assertTrue(summary.splitlines()[-1].startswith('failed: 1/2'))
+        rerun = summary.split('Rerun failed cases:\n', 1)[1].splitlines()[0].strip()
+        self.assertEqual(shlex.split(rerun), ['./run-test.sh', '1480', 'queue-opt', '--case', 'bad-output', '--mode', 'perf'])
+        replay = subprocess.run(shlex.split(rerun), cwd=ROOT, env=env, capture_output=True, text=True, timeout=40)
+        self.assertEqual(replay.returncode, 1, replay.stderr)
+        replay_summary = replay.stdout.split('\nCase summary:\n', 1)[1]
+        self.assertIn('[wrong_answer] bad-output', replay_summary)
+        self.assertNotIn('example1', replay_summary)
+        self.assertTrue(replay_summary.splitlines()[-1].startswith('failed: 0/1'))
+        structured = subprocess.run([*command, '--json-lines'], cwd=ROOT, env=env, capture_output=True, text=True, timeout=40)
+        events = [json.loads(line) for line in structured.stdout.splitlines()]
+        self.assertEqual(events[-1]['type'], 'done')
+        self.assertEqual([case['status'] for case in events[-1]['run']['cases']], ['passed', 'wrong_answer'])
+        self.assertNotIn('Case summary:', structured.stdout)
+
     def test_compiler_diagnostics(self):
         self.code(1480, 'int* runningSum( broken syntax')
         result, report = self.run_problem()
