@@ -182,6 +182,23 @@ Comparison modes are `exact`, `unordered` (outermost arrays only, preserving dup
 
 Before compiling, the CLI prints the complete compiler command, including executable, flags, source files, forced headers, and output path. Paths containing spaces are quoted. Commands appear in bold cyan on a terminal and plain text when redirected or piped. Use `FORCE_COLOR=1` to force color or `NO_COLOR=1` to disable it. JSON events contain no ANSI sequences, and web **Live output** also shows the command. Cache hits do not print a command that was not executed.
 
+Compiler and test output are read concurrently from stdout and stderr through
+nonblocking pipes. Each complete line is forwarded immediately, with no fixed
+stdout-first polling. The CLI prefixes lines with local receive time to the
+millisecond and the stream name, for example `09:10:11.123 [stderr] visiting node`.
+Stdout is gray; stderr is purple. The same color overrides apply. A final line
+without a newline is forwarded when its pipe closes. Partial lines and split
+UTF-8 characters remain buffered until the line completes. Raw per-stream log
+files retain the original bytes without timestamps or added colors; combined
+output, including unfinished lines, is limited to 2 MiB per process.
+
+Receive timestamps describe when the runner observes a complete line, not when
+the C code originally wrote it. Independent pipes cannot guarantee the original
+write order when both streams are ready together. The runtime disables C stdio
+buffering when loading input; a custom driver should do the same before logging.
+For debugging that requires a strict order, send related messages to one stream
+(for example, use `DBG` on stderr) and flush any buffering enabled by the solution.
+
 All web `solution-*.c` editors use dark C syntax highlighting for keywords, comments, strings, numbers, and functions. Editing and copying use a native textarea, with line numbers, horizontal and vertical scrolling, and error-line navigation. Prism and its C grammar are served locally without a CDN.
 
 Answers are written to a separate JSON file; stdout and stderr remain available as logs, so you can debug with `printf()`. Output is unbuffered by default. Results distinguish compilation failure, wrong answer, memory error, memory leak, undefined behavior, runtime error, driver error, timeout, and output limit.

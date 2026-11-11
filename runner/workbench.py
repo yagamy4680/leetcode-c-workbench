@@ -9,6 +9,7 @@ import math
 import os
 from pathlib import Path
 import re
+import selectors
 import shlex
 import shutil
 import signal
@@ -147,18 +148,25 @@ def compiler():
     return cc, version.strip()
 
 
+def color_enabled():
+    # Keep redirected output plain; allow the conventional color overrides.
+    force = os.environ.get('FORCE_COLOR')
+    return ('NO_COLOR' not in os.environ and force != '0' and
+            (bool(force) or (sys.stdout.isatty() and os.environ.get('TERM') != 'dumb')))
+
+
 def emit(args, event):
     if getattr(args, 'json_lines', False):
         print(json.dumps(event, ensure_ascii=False), flush=True)
     elif event['type'] == 'command':
-        # Keep redirected output plain; allow the conventional color overrides.
-        force = os.environ.get('FORCE_COLOR')
-        colored = ('NO_COLOR' not in os.environ and force != '0' and
-                   (bool(force) or (sys.stdout.isatty() and os.environ.get('TERM') != 'dumb')))
         text = '$ ' + event['text']
-        print(f'\033[1;36m{text}\033[0m' if colored else text, flush=True)
+        print(f'\033[1;36m{text}\033[0m' if color_enabled() else text, flush=True)
     elif event['type'] == 'log':
-        print(event['text'], end='', flush=True)
+        timestamp = event['timestamp'][11:23]
+        line = event['text'][:-1] if event['text'].endswith('\n') else event['text']
+        text = f'{timestamp} [{event["stream"]}] {line}'
+        color = '90' if event['stream'] == 'stdout' else '35'
+        print(f'\033[{color}m{text}\033[0m' if color_enabled() else text, flush=True)
     elif event['type'] == 'case':
         case = event['case']
         print(f'[{case["status"]}] {case["id"]} · {case["durationMs"]} ms', flush=True)
@@ -172,50 +180,86 @@ def emit(args, event):
 
 
 def execute(command, cwd, stem, timeout, env, args, case=None):
-    """Bounded logs and process-group cleanup, with live stdout/stderr forwarding."""
+    """Read both pipes as they become ready and forward complete lines immediately."""
     out, err = cwd / f'{stem}.stdout.log', cwd / f'{stem}.stderr.log'
-    readers = []
     reason = None
     started = time.monotonic()
-    with out.open('wb') as stdout, err.open('wb') as stderr:
-        proc = subprocess.Popen(command, cwd=cwd, stdout=stdout, stderr=stderr, env=env, start_new_session=True)
+    received = 0
+    stopped = False
+
+    def forward(stream, line):
+        emit(args, {'type': 'log', 'stream': stream, 'case': case,
+                    'timestamp': dt.datetime.now().astimezone().isoformat(timespec='milliseconds'),
+                    'text': line.decode('utf-8', errors='replace')})
+
+    def kill_group():
         try:
-            readers = [out.open('rb'), err.open('rb')]
-            while True:
-                for stream, reader in zip(('stdout', 'stderr'), readers):
-                    chunk = reader.read(65536)
-                    if chunk:
-                        emit(args, {'type': 'log', 'stream': stream, 'case': case, 'text': chunk.decode('utf-8', errors='replace')})
-                if out.stat().st_size + err.stat().st_size > MAX_LOG:
-                    reason = 'output_limit'
-                elif time.monotonic() - started > timeout:
-                    reason = 'timeout'
-                if reason:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                    proc.wait()
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+    def close_pipe(key):
+        if key.data['pending']:
+            forward(key.data['stream'], key.data['pending'])
+        selector.unregister(key.fileobj)
+        key.fileobj.close()
+
+    with out.open('wb') as stdout, err.open('wb') as stderr, selectors.DefaultSelector() as selector:
+        proc = subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                bufsize=0, env=env, start_new_session=True)
+        try:
+            for stream, pipe, log in (('stdout', proc.stdout, stdout), ('stderr', proc.stderr, stderr)):
+                os.set_blocking(pipe.fileno(), False)
+                selector.register(pipe, selectors.EVENT_READ, {'stream': stream, 'log': log, 'pending': b''})
+            while selector.get_map() or proc.poll() is None:
+                if not stopped:
+                    if proc.poll() is not None:
+                        # Close inherited pipes held by any surviving descendants.
+                        kill_group()
+                        stopped = True
+                    elif time.monotonic() - started >= timeout:
+                        reason = 'timeout'
+                        kill_group()
+                        proc.wait()
+                        stopped = True
+                wait = 0 if stopped else max(0, min(0.05, timeout - (time.monotonic() - started)))
+                ready = selector.select(wait)
+                if stopped and not ready:
+                    # Drain available bytes without waiting for an escaped descendant's EOF.
+                    for key in list(selector.get_map().values()):
+                        close_pipe(key)
                     break
-                if proc.poll() is not None:
-                    # A completed process may have left descendants holding resources.
+                for key, _ in ready:
+                    state = key.data
                     try:
-                        os.killpg(proc.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-                    break
-                time.sleep(0.02)
-            for stream, reader in zip(('stdout', 'stderr'), readers):
-                chunk = reader.read(MAX_LOG)
-                if chunk:
-                    emit(args, {'type': 'log', 'stream': stream, 'case': case, 'text': chunk.decode('utf-8', errors='replace')})
+                        chunk = os.read(key.fd, 65536)
+                    except BlockingIOError:
+                        continue
+                    if not chunk:
+                        close_pipe(key)
+                        continue
+                    # Bound both stored bytes and unfinished lines, including output floods.
+                    kept = chunk[:max(0, MAX_LOG - received)]
+                    received += len(kept)
+                    if kept:
+                        state['log'].write(kept)
+                        state['log'].flush()
+                        lines = (state['pending'] + kept).split(b'\n')
+                        state['pending'] = lines.pop()
+                        for line in lines:
+                            forward(state['stream'], line + b'\n')
+                    if len(kept) < len(chunk) and reason is None:
+                        reason = 'output_limit'
+                        kill_group()
+                        proc.wait()
+                        stopped = True
+            proc.wait()
         finally:
+            kill_group()
             if proc.poll() is None:
-                os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait()
-            for reader in readers:
-                reader.close()
-    for log in (out, err):
-        if log.stat().st_size > MAX_LOG:
-            with log.open('r+b') as handle:
-                handle.truncate(MAX_LOG)
+            proc.stdout.close()
+            proc.stderr.close()
     return proc.returncode, reason, round((time.monotonic() - started) * 1000)
 
 

@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 import shlex
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -33,6 +34,101 @@ static void walk(struct Node *p,int *out,int *at) { if(!p)return; out[(*at)++]=p
 int* preorder(struct Node *root,int *size) { *size=count(root); int *out=malloc((size_t)(*size)*sizeof(int)); int at=0; walk(root,out,&at); return out; }'''
 
 INORDER = 'static void visit(struct TreeNode *p, int *out, int *at) {\n    if (!p) return;\n    visit(p->left, out, at); out[(*at)++] = p->val; visit(p->right, out, at);\n}\nint* inorderTraversal(struct TreeNode *root, int *size) {\n    int *out = malloc(100 * sizeof(int)); *size = 0;\n    visit(root, out, size); return out;\n}'
+
+class ProcessOutputTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='wb-output-')
+        self.addCleanup(self.tmp.cleanup)
+        self.folder = Path(self.tmp.name)
+        self.events = []
+
+    def execute(self, code, receive=None, timeout=3):
+        receive = receive or self.events.append
+        with patch.object(wb, 'emit', side_effect=lambda args, event: receive(event)):
+            return wb.execute([sys.executable, '-u', '-c', code], self.folder, 'run', timeout,
+                              os.environ.copy(), argparse.Namespace(json_lines=True), 'interleaved')
+
+    def test_lines_stream_live_across_both_pipes_with_split_utf8_and_eof_tail(self):
+        # Each acknowledgement proves forwarding happens before the child finishes.
+        code = r'''
+import os
+from pathlib import Path
+import time
+def wait(number):
+    while not Path('ack-' + str(number)).exists():
+        time.sleep(0.001)
+os.write(2, b'error first\n')
+wait(1)
+os.write(1, b'out part')
+os.write(2, b'error while stdout incomplete\n')
+wait(2)
+os.write(1, b' rest\n\n')
+wait(4)
+os.write(1, b'\xe6')
+os.write(2, b'utf8 split\n')
+wait(5)
+os.write(1, b'\xa8\xb9\n')
+wait(6)
+os.write(2, b'final tail')
+'''
+        def receive(event):
+            self.events.append(event)
+            (self.folder / f'ack-{len(self.events)}').touch()
+        code, reason, _ = self.execute(code, receive)
+        self.assertEqual((code, reason), (0, None))
+        self.assertEqual([(e['stream'], e['text']) for e in self.events], [
+            ('stderr', 'error first\n'), ('stderr', 'error while stdout incomplete\n'),
+            ('stdout', 'out part rest\n'), ('stdout', '\n'),
+            ('stderr', 'utf8 split\n'), ('stdout', '樹\n'), ('stderr', 'final tail')])
+        for event in self.events:
+            self.assertEqual(event['case'], 'interleaved')
+            self.assertRegex(event['timestamp'], r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}[+-]\d\d:\d\d$')
+        self.assertEqual((self.folder / 'run.stdout.log').read_bytes(), 'out part rest\n\n樹\n'.encode())
+        self.assertEqual((self.folder / 'run.stderr.log').read_bytes(), b'error first\nerror while stdout incomplete\nutf8 split\nfinal tail')
+
+    def test_output_limit_bounds_logs_and_a_line_without_a_newline(self):
+        with patch.object(wb, 'MAX_LOG', 4096):
+            _, reason, _ = self.execute("import os\nwhile True: os.write(1, b'x' * 8192)")
+        self.assertEqual(reason, 'output_limit')
+        self.assertEqual((self.folder / 'run.stdout.log').stat().st_size, 4096)
+        self.assertEqual((self.folder / 'run.stderr.log').stat().st_size, 0)
+        self.assertEqual([event['text'] for event in self.events], ['x' * 4096])
+
+    def test_timeout_flushes_partial_line_and_still_waits_after_both_pipes_close(self):
+        _, reason, _ = self.execute("import os, time\nos.write(2, b'waiting')\ntime.sleep(30)", timeout=0.2)
+        self.assertEqual(reason, 'timeout')
+        self.assertEqual([event['text'] for event in self.events], ['waiting'])
+        _, reason, _ = self.execute('import os, time\nos.close(1)\nos.close(2)\ntime.sleep(30)', timeout=0.2)
+        self.assertEqual(reason, 'timeout')
+
+    def test_completed_parent_cleans_up_descendants_holding_pipes(self):
+        code, reason, duration = self.execute("import subprocess, sys\nsubprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])")
+        self.assertEqual((code, reason), (0, None))
+        self.assertLess(duration, 2000)
+
+    def test_console_timestamps_stream_colors_and_plain_json_events(self):
+        args = argparse.Namespace(json_lines=False)
+        for stream, color in (('stdout', '90'), ('stderr', '35')):
+            for text in ('hello\n', 'tail'):
+                event = {'type': 'log', 'stream': stream, 'case': 'single',
+                         'timestamp': '2026-11-11T09:10:11.123+08:00', 'text': text}
+                modes = (({'TERM': 'xterm-256color'}, True, True), ({}, False, False),
+                         ({'FORCE_COLOR': '1'}, False, True),
+                         ({'FORCE_COLOR': '1', 'NO_COLOR': ''}, True, False),
+                         ({'FORCE_COLOR': '0'}, True, False))
+                for env, tty, colored in modes:
+                    with self.subTest(stream=stream, text=text, env=env):
+                        output = io.StringIO()
+                        with patch.dict(os.environ, env, clear=True), contextlib.redirect_stdout(output), patch.object(output, 'isatty', return_value=tty):
+                            wb.emit(args, event)
+                        line = f'09:10:11.123 [{stream}] ' + text.rstrip('\n')
+                        self.assertEqual(output.getvalue(), (f'\033[{color}m{line}\033[0m' if colored else line) + '\n')
+                output = io.StringIO()
+                with patch.dict(os.environ, {'FORCE_COLOR': '1'}, clear=True), contextlib.redirect_stdout(output):
+                    wb.emit(argparse.Namespace(json_lines=True), event)
+                self.assertEqual(json.loads(output.getvalue()), event)
+                self.assertNotIn('\033', output.getvalue())
+
 
 class RunnerTests(unittest.TestCase):
     def setUp(self):
@@ -126,12 +222,23 @@ wb_result_array(argv[2],out,list.count);free(out);wb_list_free(&list);wb_json_fr
         self.assertEqual(len(wb.read_json(self.data/'runs'/first['id']/'source/problem/tests.json')), 5)
 
     def test_stdout_is_debug_output_not_answer(self):
-        self.code(1480, ARRAY)
-        _, report = self.run_problem(1480,'master','--case','single')
+        self.code(1480, ARRAY.replace('printf(', 'fprintf(stderr, "stderr trace\\n"); printf('))
+        result, report = self.run_problem(1480,'master','--case','single')
         self.assertEqual(report['status'],'passed')
         folder=self.data/'runs'/report['id']/'cases/single'
-        self.assertIn('processed', (folder/'run.stdout.log').read_text())
+        self.assertEqual((folder/'run.stdout.log').read_text(), 'processed 1 elements\n')
+        self.assertEqual((folder/'run.stderr.log').read_text(), 'stderr trace\n')
         self.assertEqual(wb.read_json(folder/'actual.json'), [5])
+        logs = [json.loads(line) for line in result.stdout.splitlines() if json.loads(line)['type'] == 'log']
+        self.assertCountEqual([(event['stream'], event['text']) for event in logs],
+                              [('stderr', 'stderr trace\n'), ('stdout', 'processed 1 elements\n')])
+        self.assertTrue(all('timestamp' in event for event in logs))
+        console_env = {key: value for key, value in self.env.items() if key != 'NO_COLOR'}
+        console = subprocess.run([str(ROOT/'run-test.sh'), '1480', '--case', 'single', '--mode', 'perf'],
+                                 env={**console_env, 'FORCE_COLOR': '1'}, capture_output=True, text=True, timeout=40)
+        self.assertEqual(console.returncode, 0, console.stdout + console.stderr)
+        self.assertRegex(console.stdout, r'\x1b\[90m\d\d:\d\d:\d\d\.\d{3} \[stdout\] processed 1 elements\x1b\[0m\n')
+        self.assertRegex(console.stdout, r'\x1b\[35m\d\d:\d\d:\d\d\.\d{3} \[stderr\] stderr trace\x1b\[0m\n')
 
     def test_input_alias_is_not_double_freed(self):
         self.code(1480, 'int* runningSum(int* a,int n,int* s) { for(int i=1;i<n;i++)a[i]+=a[i-1]; *s=n; return a; }')

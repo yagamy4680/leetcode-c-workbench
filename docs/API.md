@@ -144,7 +144,16 @@ numeric tree data; this API does not accept arbitrary Graphviz source or paths.
 
 Request: `{ "solution": "master", "mode": "debug", "case": "example1", "sourceHash": "..." }`. Omit case for all cases. mode can be debug or perf. sourceHash protects against local edits before the runner captures its source.
 
-Each output line is a JSON event: `start`, `command` (argv and shell-quoted text, without ANSI), `log` (stream/case/text), `message`, `case`, `done` (run report), or `error`. A test failure still uses a successful HTTP response; inspect done.run.status. Connection loss does not cancel the native job; recover the report from History after completion.
+Each output line is a JSON event: `start`, `command` (argv and shell-quoted text, without ANSI), `log` (stream/case/text/timestamp), `message`, `case`, `done` (run report), or `error`. A test failure still uses a successful HTTP response; inspect done.run.status. Connection loss does not cancel the native job; recover the report from History after completion.
+
+Each `log` event contains one complete stdout or stderr line, including its
+newline, or a final fragment when that pipe closes. `timestamp` is the local
+receive time in ISO 8601 format with milliseconds and a UTC offset. `text`
+retains the decoded line without runner-added timestamps or ANSI colors. Both
+pipes are monitored concurrently and events are forwarded in observed read
+order; independent pipes do not provide an absolute order for simultaneous
+writes. Raw log downloads retain the original per-stream bytes. A line without
+a newline remains buffered until EOF, termination, or the output limit.
 
 Each case's default timeout is 2000 ms, adjustable from 10–60000 ms. Each process's logs are capped at 2 MiB; the live browser view retains the last 250000 characters, while stored logs can be selected separately.
 
