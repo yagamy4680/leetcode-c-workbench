@@ -146,6 +146,10 @@ Request: `{ "solution": "master", "mode": "debug", "case": "example1", "sourceHa
 
 Each output line is a JSON event: `start`, `command` (argv and shell-quoted text, without ANSI), `log` (stream/case/text/timestamp), `message`, `case`, `done` (run report), or `error`. A test failure still uses a successful HTTP response; inspect done.run.status. Connection loss does not cancel the native job; recover the report from History after completion.
 
+Failed cases include `errorSummary`, a concise plain-text explanation, in both
+`case` events and persisted run reports. Their `status` retains its original
+value, such as `wrong_answer`, `undefined_behavior`, or `driver_error`.
+
 Each `log` event contains one complete stdout or stderr line, including its
 newline, or a final fragment when that pipe closes. `timestamp` is the local
 receive time in ISO 8601 format with milliseconds and a UTC offset. `text`

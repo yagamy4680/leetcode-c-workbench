@@ -6,6 +6,8 @@ import io
 import json
 import os
 from pathlib import Path
+import re
+import signal
 import subprocess
 import shlex
 import sys
@@ -257,6 +259,7 @@ wb_result_array(argv[2],out,list.count);free(out);wb_list_free(&list);wb_json_fr
         self.assertEqual(console.returncode, 0, console.stdout + console.stderr)
         self.assertRegex(console.stdout, r'\x1b\[90m\d\d:\d\d:\d\d\.\d{3} \[stdout\] processed 1 elements\x1b\[0m\n')
         self.assertRegex(console.stdout, r'\x1b\[35m\d\d:\d\d:\d\d\.\d{3} \[stderr\] stderr trace\x1b\[0m\n')
+        self.assertEqual(console.stdout.count('[\033[32mpassed\033[0m] single.'), 2)
 
     def test_input_alias_is_not_double_freed(self):
         self.code(1480, 'int* runningSum(int* a,int n,int* s) { for(int i=1;i<n;i++)a[i]+=a[i-1]; *s=n; return a; }')
@@ -274,8 +277,16 @@ wb_result_array(argv[2],out,list.count);free(out);wb_list_free(&list);wb_json_fr
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertGreater(result.stdout.count('verbose trace'), 3000)
         summary = result.stdout.split('\nCase summary:\n', 1)[1]
-        self.assertIn('[passed] example1', summary)
-        self.assertIn('[wrong_answer] bad-output', summary)
+        run_id = result.stdout.splitlines()[-1].rsplit(' ', 1)[1]
+        report = wb.read_json(self.data/'runs'/run_id/'result.json')
+        for case in report['cases']:
+            if case['status'] == 'passed':
+                line = f'[passed] {case["id"]}. {case["durationMs"]}ms'
+            else:
+                line = f'[failed] {case["id"]}. {case["durationMs"]}ms ({case["errorSummary"]})'
+            self.assertIn('  ' + line + '\n', summary)
+            self.assertEqual(result.stdout.count(line + '\n'), 2)
+        self.assertEqual(report['cases'][1]['errorSummary'], 'Output does not match expected at $[0]')
         self.assertNotIn('verbose trace', summary)
         self.assertNotIn('input:', summary)
         self.assertNotIn('expected:', summary)
@@ -283,17 +294,38 @@ wb_result_array(argv[2],out,list.count);free(out);wb_list_free(&list);wb_json_fr
         self.assertTrue(summary.splitlines()[-1].startswith('failed: 1/2'))
         rerun = summary.split('Rerun failed cases:\n', 1)[1].splitlines()[0].strip()
         self.assertEqual(shlex.split(rerun), ['./run-test.sh', '1480', 'queue-opt', '--case', 'bad-output', '--mode', 'perf'])
-        replay = subprocess.run(shlex.split(rerun), cwd=ROOT, env=env, capture_output=True, text=True, timeout=40)
+        color_env = {key: value for key, value in env.items() if key != 'NO_COLOR'}
+        replay = subprocess.run(shlex.split(rerun), cwd=ROOT, env={**color_env, 'FORCE_COLOR': '1'}, capture_output=True, text=True, timeout=40)
         self.assertEqual(replay.returncode, 1, replay.stderr)
-        replay_summary = replay.stdout.split('\nCase summary:\n', 1)[1]
-        self.assertIn('[wrong_answer] bad-output', replay_summary)
+        self.assertEqual(replay.stdout.count('[\033[31mfailed\033[0m] bad-output.'), 2)
+        replay_summary = re.sub(r'\x1b\[[0-9;]*m', '', replay.stdout).split('\nCase summary:\n', 1)[1]
+        self.assertRegex(replay_summary, r'\[failed\] bad-output\. \d+ms \(Output does not match expected at \$\[0\]\)')
         self.assertNotIn('example1', replay_summary)
         self.assertTrue(replay_summary.splitlines()[-1].startswith('failed: 0/1'))
         structured = subprocess.run([*command, '--json-lines'], cwd=ROOT, env=env, capture_output=True, text=True, timeout=40)
         events = [json.loads(line) for line in structured.stdout.splitlines()]
         self.assertEqual(events[-1]['type'], 'done')
         self.assertEqual([case['status'] for case in events[-1]['run']['cases']], ['passed', 'wrong_answer'])
+        self.assertEqual(events[-1]['run']['cases'][1]['errorSummary'], 'Output does not match expected at $[0]')
         self.assertNotIn('Case summary:', structured.stdout)
+
+    def test_failure_summaries_explain_crashes_and_invalid_return_values(self):
+        scenarios = [
+            ('crash', '#include <signal.h>\n' + ARRAY.replace('int *out=malloc', 'raise(SIGSEGV); int *out=malloc'),
+             'runtime_error', 'Program crashed: SIGSEGV'),
+            ('invalid-size', ARRAY.replace('*size=n;', '*size=-1;'),
+             'driver_error', 'Driver error: invalid returnSize or NULL result'),
+        ]
+        for variant, source, status, summary in scenarios:
+            with self.subTest(variant=variant):
+                self.code(1480, source, variant)
+                result, report = self.run_problem(1480, variant, '--case', 'single', '--mode', 'perf')
+                self.assertEqual(result.returncode, 1)
+                case = report['cases'][0]
+                self.assertEqual(case['status'], status)
+                self.assertEqual(case['errorSummary'], summary)
+                if variant == 'crash':
+                    self.assertEqual(case['exitCode'], -signal.SIGSEGV)
 
     def test_compiler_diagnostics(self):
         self.code(1480, 'int* runningSum( broken syntax')
@@ -391,6 +423,8 @@ wb_result_array(argv[2],out,list.count);free(out);wb_list_free(&list);wb_json_fr
         folder = self.data/'runs'/report['id']
         self.assertEqual(wb.read_json(folder/'result.json'), report)
         self.assertIn('member access within null pointer', (folder/'cases/empty-root/run.stderr.log').read_text())
+        self.assertIn('member access within null pointer', report['cases'][0]['errorSummary'])
+        self.assertTrue(report['cases'][0]['errorSummary'].startswith('Undefined behavior:'))
         events = [json.loads(line) for line in output.getvalue().splitlines()]
         self.assertEqual(events[-1]['type'], 'done')
         self.assertEqual(events[-1]['run']['passed'], 1)
@@ -402,6 +436,7 @@ wb_result_array(argv[2],out,list.count);free(out);wb_list_free(&list);wb_json_fr
             {'id':'next','input':{'nums':[7]},'expected':[7]}])
         _, report = self.run_problem()
         self.assertEqual([c['status'] for c in report['cases']], ['timeout','passed'])
+        self.assertEqual(report['cases'][0]['errorSummary'], 'Time limit exceeded')
 
     def test_bad_input_is_driver_error(self):
         self.code(783, BST)

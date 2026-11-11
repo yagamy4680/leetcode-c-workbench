@@ -44,14 +44,21 @@ Problems live in `$WB_DATA_DIR/problems/<id>/`. Edit `solution-master.c` with yo
 Names such as `master` and `non-recursive` identify solution files, not Git branches. Use **New variant** in the web interface or copy a solution to `solution-<name>.c` in the problem directory.
 
 At the end of each CLI run, a compact case summary lists every executed case ID
-and its status without repeating input, expected output, or logs. Passed cases
-are green and failed cases are red on a terminal, with the usual `NO_COLOR` and
-`FORCE_COLOR` overrides. Each failed case also gets a command to rerun it from
+and its status without repeating input, expected output, or logs. Both live
+results and the final summary use `[passed] example1. 26ms` or
+`[failed] empty. 26ms (Undefined behavior: member access within null pointer)`.
+The `passed` label is green and `failed` is red on a terminal, with the usual
+`NO_COLOR` and `FORCE_COLOR` overrides. Durations come from each case's measured
+execution time. Failure summaries distinguish output mismatches, crashes,
+invalid return values or driver input, memory errors, leaks, undefined behavior,
+timeouts, and excessive output. Diagnostic details are kept to one compact line.
+Each failed case also gets a command to rerun it from
 the application directory, preserving the solution variant and debug/performance
 mode, for example `./run-test.sh 429 queue-opt --case empty --mode debug`.
 The aggregate result, such as `failed: 13/17`, stays on the final line. Compile
 errors explicitly report that no cases ran. `--json-lines` keeps its structured
-events without adding console summary text.
+events and original status values (such as `wrong_answer`); failed cases also
+include the plain-text `errorSummary` field, without adding console summary text.
 
 You can also use `make run PROBLEM=589 SOLUTION=non-recursive MODE=debug`. Run `make help` for other entry points.
 

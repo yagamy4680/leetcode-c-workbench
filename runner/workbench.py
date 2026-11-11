@@ -155,6 +155,58 @@ def color_enabled():
             (bool(force) or (sys.stdout.isatty() and os.environ.get('TERM') != 'dumb')))
 
 
+def case_error_summary(case, stderr=''):
+    status = case['status']
+    messages = {
+        'wrong_answer': 'Output does not match expected',
+        'memory_error': 'Memory error detected by AddressSanitizer',
+        'memory_leak': 'Memory leak detected',
+        'undefined_behavior': 'Undefined behavior detected by UBSan',
+        'driver_error': 'Driver rejected input or return value',
+        'runtime_error': 'Program exited unsuccessfully',
+        'timeout': 'Time limit exceeded',
+        'output_limit': 'Output limit exceeded',
+    }
+    message = messages.get(status, status.replace('_', ' '))
+    if status == 'wrong_answer' and case.get('difference'):
+        message += ' at ' + case['difference']
+    elif status in ('driver_error', 'undefined_behavior', 'memory_error'):
+        prefix = {'driver_error': 'Driver error:', 'undefined_behavior': 'runtime error:',
+                  'memory_error': 'ERROR: AddressSanitizer:'}[status]
+        match = re.search(re.escape(prefix) + r'\s*([^\r\n]+)', stderr)
+        if match:
+            label = {'driver_error': 'Driver error', 'undefined_behavior': 'Undefined behavior',
+                     'memory_error': 'Memory error'}[status]
+            message = f'{label}: {match.group(1)}'
+        elif case.get('error'):
+            message = 'Invalid result: ' + case['error']
+    elif status == 'runtime_error' and case.get('exitCode') is not None:
+        code = case['exitCode']
+        if code < 0:
+            try:
+                message = 'Program crashed: ' + signal.Signals(-code).name
+            except ValueError:
+                message = f'Program terminated by signal {-code}'
+        else:
+            message = f'Program exited with code {code}'
+    # Keep the final summary compact even when a driver includes verbose diagnostics.
+    message = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', message)
+    message = ' '.join(re.sub(r'[\x00-\x1f\x7f]', ' ', message).split())
+    return message if len(message) <= 160 else message[:157] + '...'
+
+
+def format_case_result(case, colored=False):
+    passed = case['status'] == 'passed'
+    label = 'passed' if passed else 'failed'
+    if colored:
+        color = '32' if passed else '31'
+        label = f'\033[{color}m{label}\033[0m'
+    text = f'[{label}] {case["id"]}. {case["durationMs"]}ms'
+    if not passed:
+        text += ' (' + (case.get('errorSummary') or case_error_summary(case)) + ')'
+    return text
+
+
 def emit(args, event):
     if getattr(args, 'json_lines', False):
         print(json.dumps(event, ensure_ascii=False), flush=True)
@@ -169,7 +221,7 @@ def emit(args, event):
         print(f'\033[{color}m{text}\033[0m' if color_enabled() else text, flush=True)
     elif event['type'] == 'case':
         case = event['case']
-        print(f'[{case["status"]}] {case["id"]} · {case["durationMs"]} ms', flush=True)
+        print(format_case_result(case, color_enabled()), flush=True)
         if case['status'] == 'wrong_answer':
             print(f'  input:    {json.dumps(case["input"], ensure_ascii=False)}\n  expected: {json.dumps(case["expected"], ensure_ascii=False)}\n  actual:   {json.dumps(case.get("actual"), ensure_ascii=False)}\n  diff:     {case.get("difference")}', flush=True)
     elif event['type'] == 'message':
@@ -180,9 +232,7 @@ def emit(args, event):
             print('\nCase summary:', flush=True)
             colored = color_enabled()
             for case in run['cases']:
-                text = f'  [{case["status"]}] {case["id"]}'
-                color = '32' if case['status'] == 'passed' else '31'
-                print(f'\033[{color}m{text}\033[0m' if colored else text, flush=True)
+                print('  ' + format_case_result(case, colored), flush=True)
             failed = [case for case in run['cases'] if case['status'] != 'passed']
             if failed:
                 print('\nRerun failed cases:', flush=True)
@@ -470,6 +520,8 @@ def run(data, args):
                 except (OSError, ValueError) as exc:
                     outcome['status'] = 'driver_error'
                     outcome['error'] = str(exc)
+            if outcome['status'] != 'passed':
+                outcome['errorSummary'] = case_error_summary(outcome, errors)
             report['cases'].append(outcome)
             report['passed'] += int(outcome['status'] == 'passed')
             write_json(folder / 'result.json', report)
