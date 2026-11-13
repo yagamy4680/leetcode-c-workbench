@@ -91,6 +91,20 @@ and submission snapshots are preserved. Updating an older checkout requires
 `git pull`, `npm ci` (including Prisma Client generation), and a service restart;
 no database reset is needed.
 
+Difficulty labels use LeetCode's light-theme colors in the problem list, header,
+and Similar questions links: teal for Easy, yellow for Medium, and red for Hard.
+
+Click **Export CSV** in the header to download **all** indexed problems, ordered
+by problem ID, regardless of search, acceptance, or topic filters. The file has
+five columns: `problem-id`, `problem-url`, `difficulty`, `passed`, and `accepted`.
+`passed` is `true` when the latest completed local run passed and `false` when it
+failed; it is empty if the problem has never been run. This uses the same latest
+run shown in the sidebar, across all solution variants, including single-case
+runs. It does not recheck edited code or require a full-suite run. `accepted` is
+the manual LeetCode mark, written as `true` or `false`. The export uses UTF-8 with
+a BOM, standard CSV quoting, CRLF records, and spreadsheet formula protection
+for imported metadata. It contains metadata and status, not source or test data.
+
 ## Fetching and validating problems
 
 Follow [skills/fetch-leetcode-problem/SKILL.md](skills/fetch-leetcode-problem/SKILL.md)

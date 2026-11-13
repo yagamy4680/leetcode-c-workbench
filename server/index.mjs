@@ -12,6 +12,7 @@ import { createIndexer, syncProblem } from './indexer.mjs';
 import { createBatchImports } from './batch-import.mjs';
 import { createSourceEvents } from './source-events.mjs';
 import { visualizeTree } from './tree-visualization.mjs';
+import { problemCsv } from './problem-csv.mjs';
 
 export function auth(req, res, next) {
   const header = req.get('authorization') || '';
@@ -118,6 +119,14 @@ export async function createApp(db = createDatabaseClient()) {
   });
   app.get('/api/health', (req, res) => res.json({ ok: true }));
   app.get('/api/doctor', async (req, res) => res.json(await runCommand(['doctor', ...(req.query.refresh === '1' ? ['--refresh'] : [])])));
+  app.get('/api/problems/export.csv', async (req, res) => {
+    await sync();
+    const problems = await db.problem.findMany({ orderBy: { id: 'asc' }, select: {
+      id: true, url: true, difficulty: true, accepted: true,
+      runs: { orderBy: { startedAt: 'desc' }, take: 1, select: { status: true } }
+    } });
+    res.attachment('leetcode-problems.csv').type('text/csv; charset=utf-8').set('Cache-Control', 'no-store').send(problemCsv(problems));
+  });
   app.get('/api/problems', async (req, res) => {
     const where = problemFilters(req.query);
     await sync();

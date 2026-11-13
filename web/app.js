@@ -3,6 +3,11 @@ const $ = id => document.getElementById(id);
 const state = { problems: [], problem: null, variant: 'master', sourceHash: '', savedCode: '', testsHash: '', savedTests: '', report: null, running: false, preparing: false, loading: false, viewEpoch: 0, savingCode: null, savingTests: null, snapshot: null, live: '', externalConflict: false, tags: [], selectedTags: new Set(), listEpoch: 0, accepting: false };
 const esc = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const label = value => String(value).replaceAll('_', ' ');
+function difficultyMarkup(value) {
+  const level = String(value).toLowerCase();
+  const tone = ['easy', 'medium', 'hard'].includes(level) ? ` difficulty-${level}` : '';
+  return `<span class="difficulty${tone}">${esc(value)}</span>`;
+}
 const date = value => new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 function notice(text, error = false) { $('notice').hidden = !text; $('notice').textContent = text; $('notice').className = error ? 'error' : ''; }
 async function api(url, options = {}) {
@@ -60,16 +65,26 @@ function showTreeInput(problemId, testcase) {
   $('tree-input-info').textContent = oversized ? 'Input exceeds 2,048 characters. Download the complete input as text.' : '';
   $('tree-input-download').hidden = !oversized; $('tree-input-download').disabled = !oversized;
 }
-function saveTreeDownload(blob, filename) {
+function saveDownload(blob, filename) {
   const url = URL.createObjectURL(blob), link = document.createElement('a');
   link.href = url; link.download = filename;
   document.body.append(link); link.click(); link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
+async function exportProblems() {
+  const button = $('export-btn');
+  if (button.disabled) return;
+  button.disabled = true; button.textContent = 'Exporting…';
+  try {
+    const response = await api('/api/problems/export.csv');
+    saveDownload(await response.blob(), 'leetcode-problems.csv');
+    notice('CSV exported. Includes all problems, regardless of filters.');
+  } finally { button.disabled = false; button.textContent = 'Export CSV'; }
+}
 function downloadTreeInput() {
   if (!treeInputSnapshot) return;
   const snapshot = treeInputSnapshot, caseId = snapshot.id.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64);
-  saveTreeDownload(new Blob([snapshot.text + '\n'], { type: 'text/plain;charset=utf-8' }), `problem-${snapshot.problemId}-${caseId}-input.txt`);
+  saveDownload(new Blob([snapshot.text + '\n'], { type: 'text/plain;charset=utf-8' }), `problem-${snapshot.problemId}-${caseId}-input.txt`);
 }
 function syncTreeCases(tests, preferred = $('tree-case').value) {
   $('tree-case').innerHTML = tests.map(test => `<option value="${esc(test.id)}">${esc(test.id)}</option>`).join('');
@@ -120,13 +135,13 @@ async function downloadTree(format) {
     const response = await api(`/api/problems/${snapshot.problemId}/tree`, { method: 'POST', signal: treeController.signal, body: JSON.stringify({ input: snapshot.input, kind: snapshot.kind, format }) });
     const blob = await response.blob();
     if (epoch !== treeEpoch || treeSnapshot !== snapshot) return;
-    saveTreeDownload(blob, `problem-${snapshot.problemId}-${snapshot.id.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64)}.${format}`);
+    saveDownload(blob, `problem-${snapshot.problemId}-${snapshot.id.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64)}.${format}`);
   } catch (error) { if (epoch === treeEpoch && error.name !== 'AbortError') $('tree-error').textContent = error.message; }
   finally { if (epoch === treeEpoch && treeSnapshot === snapshot) { $('tree-svg').disabled = false; $('tree-dot').disabled = false; $('tree-status').textContent = previousStatus; } }
 }
 function renderProblems() {
   const items = state.problems;
-  $('problems').innerHTML = items.length ? items.map(p => `<button type="button" class="problem-item" data-problem="${p.id}" ${p.id === state.problem?.id ? 'aria-current="page"' : ''}><strong>${p.id}. ${esc(p.title)}</strong><small>${esc(p.difficulty)} · ${p.solutions.length} solution${p.solutions.length === 1 ? '' : 's'}${p.runs[0] ? ` · <span class="run-status ${p.runs[0].status === 'passed' ? 'status-passed' : 'status-error'}">${esc(label(p.runs[0].status))}</span>` : ''}</small>${p.accepted ? '<span class="accepted-label">Accepted</span>' : ''}</button>`).join('') : '<p class="muted">No matching problems. Change filters or import a problem.</p>';
+  $('problems').innerHTML = items.length ? items.map(p => `<button type="button" class="problem-item" data-problem="${p.id}" ${p.id === state.problem?.id ? 'aria-current="page"' : ''}><strong>${p.id}. ${esc(p.title)}</strong><small>${difficultyMarkup(p.difficulty)} · ${p.solutions.length} solution${p.solutions.length === 1 ? '' : 's'}${p.runs[0] ? ` · <span class="run-status ${p.runs[0].status === 'passed' ? 'status-passed' : 'status-error'}">${esc(label(p.runs[0].status))}</span>` : ''}</small>${p.accepted ? '<span class="accepted-label">Accepted</span>' : ''}</button>`).join('') : '<p class="muted">No matching problems. Change filters or import a problem.</p>';
   $('filter-status').textContent = `${items.length} problem${items.length === 1 ? '' : 's'}`;
   $('clear-filters').hidden = !$('search').value && !$('accepted-filter').value && !state.selectedTags.size;
 }
@@ -178,8 +193,8 @@ function renderSimilarQuestions(questions) {
   const items = Array.isArray(questions) ? questions : [];
   $('similar-questions').hidden = !items.length;
   $('similar-list').innerHTML = items.map(question => {
-    const text = `${question.id ? question.id + '. ' : ''}${question.title} (${question.difficulty})${question.isPaidOnly ? ' · Premium' : ''}`;
-    return /^https:\/\/leetcode\.com\/problems\/[a-z0-9-]+\/$/.test(question.url) ? `<li><a href="${esc(question.url)}" target="_blank" rel="noopener noreferrer">${esc(text)}</a></li>` : `<li>${esc(text)}</li>`;
+    const text = `${question.id ? esc(question.id) + '. ' : ''}${esc(question.title)} (${difficultyMarkup(question.difficulty)})${question.isPaidOnly ? ' · Premium' : ''}`;
+    return /^https:\/\/leetcode\.com\/problems\/[a-z0-9-]+\/$/.test(question.url) ? `<li><a href="${esc(question.url)}" target="_blank" rel="noopener noreferrer">${text}</a></li>` : `<li>${text}</li>`;
   }).join('');
 }
 let batchPreview = null;
@@ -298,7 +313,7 @@ async function loadProblem(id, keepTab = false, discardConfirmed = false) {
   state.problem = p; renderAcceptance();
   $('case-form').hidden = true; $('case-input').value = ''; $('case-expected').value = '';
   $('problem').hidden = false; $('empty').hidden = true; $('problem-title').textContent = `${p.id}. ${p.title}`;
-  $('problem-meta').textContent = `${p.difficulty} · ${p.manifest.topics.join(' · ')}`;
+  $('problem-meta').innerHTML = `${difficultyMarkup(p.difficulty)} · ${esc(p.manifest.topics.join(' · '))}`;
   const original = /^https:\/\/leetcode\.com\/problems\//.test(p.url) ? p.url : 'https://leetcode.com';
   $('original-link').href = original; $('submit-original').href = original;
   $('description-body').innerHTML = DOMPurify.sanitize(marked.parse(p.description));
@@ -477,6 +492,7 @@ bind('problem-accepted', 'change', saveAcceptance);
 bind('tag-options', 'change', event => { const input = event.target; if (input.type !== 'checkbox') return; if (input.checked) state.selectedTags.add(input.value); else state.selectedTags.delete(input.value); $('tag-filter-summary').textContent = state.selectedTags.size ? `Tags (${state.selectedTags.size} selected)` : 'Tags'; filterProblems(); });
 bind('clear-filters', 'click', async () => { clearTimeout(filterTimer); $('search').value = ''; $('accepted-filter').value = ''; state.selectedTags.clear(); await refresh(); $('search').focus(); });
 bind('refresh-btn', 'click', async () => { await refresh(); notice('Problem list refreshed.'); });
+bind('export-btn', 'click', exportProblems);
 bind('code', 'input', lines);
 bind('code', 'scroll', syncEditorScroll);
 bind('code', 'keydown', e => { if (e.key === 'Escape') { e.preventDefault(); $('save-code').focus(); } if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); const start = e.target.selectionStart, end = e.target.selectionEnd; e.target.setRangeText('    ', start, end, 'end'); lines(); } });

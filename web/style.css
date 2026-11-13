@@ -6,6 +6,9 @@
   --surface: #f4f6f8;
   --accent: #225cac;
   --focus: #1c5cb4;
+  --difficulty-easy: #1cb8b8;
+  --difficulty-medium: #ffb800;
+  --difficulty-hard: #f63636;
   --bs-primary: #225cac;
   --bs-body-color: var(--ink);
   --bs-body-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -21,6 +24,11 @@ textarea { caret-color: var(--accent); }
 .btn-primary { --bs-btn-bg: var(--accent); --bs-btn-border-color: var(--accent); --bs-btn-hover-bg: #194984; --bs-btn-hover-border-color: #194984; }
 .btn-outline-primary { --bs-btn-color: var(--accent); --bs-btn-border-color: var(--accent); --bs-btn-hover-bg: var(--accent); --bs-btn-hover-border-color: var(--accent); }
 .app-header { min-height: 64px; padding: 14px 24px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.header-actions { flex-wrap: wrap; }
+.difficulty { font-weight: 600; }
+.difficulty-easy { color: var(--difficulty-easy); }
+.difficulty-medium { color: var(--difficulty-medium); }
+.difficulty-hard { color: var(--difficulty-hard); }
 .brand { font-size: 18px; font-weight: 700; text-decoration: none; color: var(--ink); white-space: nowrap; }
 .brand span { font-weight: 400; margin-left: 5px; }
 .app-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: calc(100vh - 64px); }

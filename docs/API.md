@@ -7,6 +7,7 @@ All endpoints require HTTP Basic Auth, including static files. Use HTTPS at `lee
 | GET | `/api/health` | Authenticated health check |
 | GET | `/api/doctor` | Compiler and sanitizer probe; `?refresh=1` repeats it |
 | GET | `/api/problems` | Filtered problems, accepted status, normalized tags, solutions, latest run |
+| GET | `/api/problems/export.csv` | Download all problems and their local/LeetCode status as CSV |
 | GET | `/api/tags` | Active topic tags and problem counts |
 | PATCH | `/api/problems/:id` | Set manual problem-level `{accepted: true/false}` |
 | POST | `/api/problems` | New problem import or explicitly confirmed replacement |
@@ -36,6 +37,24 @@ preview token, overwrite confirmation, expiration, and partial-result contract.
 It uses the same authentication, origin checks, and bundle validator as single
 imports. Preview never writes problem files. Commit can import multiple IDs,
 with atomic replacement and backups per problem.
+
+## CSV export
+
+`GET /api/problems/export.csv` requires Basic Auth and returns an attachment named
+`leetcode-problems.csv` with `Content-Type: text/csv; charset=utf-8` and
+`Cache-Control: no-store`. The server indexes completed CLI runs and problem
+files before exporting every indexed problem in ascending ID order. Search,
+accepted, and tag query parameters do not restrict this all-problem export.
+
+The five columns are `problem-id`, `problem-url`, `difficulty`, `passed`, and
+`accepted`. Difficulty preserves the stored Easy/Medium/Hard value. `passed` is
+`true` or `false` from the most recent completed run across all variants, or
+empty if there is no run. Like the sidebar, it includes single-case runs and
+does not verify that the last run still matches edited code or the full suite.
+`accepted` is the independent manual boolean mark. CSV uses UTF-8 with a BOM,
+CRLF records, doubled quotes inside quoted fields, and an apostrophe prefix on
+metadata cells that spreadsheet applications could interpret as formulas.
+An empty workspace produces only the header. No problem files are modified.
 
 ## Problem bundle
 

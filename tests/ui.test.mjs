@@ -39,10 +39,47 @@ async function harness(handler=()=>undefined) {
     throw new Error(`Unexpected request ${call.method} ${route}`);
   };
   w.eval(fs.readFileSync('web/test-case.js','utf8'));
-  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode,refresh,refreshExternalCode,openCaseForm,addPastedCase,saveAcceptance,renderProblems,previewBatch,commitBatch,activateTab,updateTreePreview,downloadTree,downloadTreeInput};');
+  w.eval(source+'\nwindow.hooks={state,dirty,testsDirty,loadProblem,saveCode,saveTests,runTests,showReport,showLog,highlightCode,refresh,refreshExternalCode,openCaseForm,addPastedCase,saveAcceptance,renderProblems,previewBatch,commitBatch,activateTab,updateTreePreview,downloadTree,downloadTreeInput,exportProblems};');
   await pause();await w.hooks.loadProblem(1480);
   return {w,calls,$:id=>w.document.getElementById(id),close:()=>w.close()};
 }
+
+test('difficulty labels share semantic colors in navigation, metadata and related links and escape imported text',async()=>{
+  const questions=['Easy','Medium','Hard'].map((difficulty,i)=>({id:i+1,title:'Related <title>',slug:`related-${i}`,url:`https://leetcode.com/problems/related-${i}/`,difficulty}));
+  const detail=problem(1480,{difficulty:'Hard',manifest:{topics:['<img src=x onerror=alert(1)>'],similarQuestions:questions}});
+  const h=await harness(call=>call.route==='/api/problems'?response(questions.map(q=>problem(q.id,{difficulty:q.difficulty}))):call.route==='/api/problems/1480'?response(detail):undefined);
+  assert.deepEqual([...h.w.document.querySelectorAll('#problems .difficulty')].map(el=>el.className),['difficulty difficulty-easy','difficulty difficulty-medium','difficulty difficulty-hard']);
+  assert.equal(h.$('problem-meta').querySelector('.difficulty-hard').textContent,'Hard');
+  assert.ok(h.$('problem-meta').textContent.includes('<img src=x onerror=alert(1)>'));
+  assert.equal(h.$('problem-meta').querySelector('img'),null);
+  assert.deepEqual([...h.$('similar-list').querySelectorAll('.difficulty')].map(el=>el.textContent),['Easy','Medium','Hard']);
+  assert.equal(h.$('similar-list').querySelector('title'),null);h.close();
+});
+
+test('CSV download ignores active filters, prevents duplicate exports and preserves drafts',async()=>{
+  const ack=deferred();
+  const h=await harness(call=>call.route==='/api/problems/export.csv'?ack.promise:undefined);
+  h.$('search').value='hidden';h.$('accepted-filter').value='true';h.w.hooks.state.selectedTags.add('Tree');
+  h.$('code').value='unsaved solution';h.$('tests-json').value='unsaved tests';
+  let blob,filename;h.w.URL.createObjectURL=value=>{blob=value;return 'blob:csv';};h.w.URL.revokeObjectURL=()=>{};
+  h.w.HTMLAnchorElement.prototype.click=function(){filename=this.download;};
+  const exporting=h.w.hooks.exportProblems();await h.w.hooks.exportProblems();
+  assert.equal(h.$('export-btn').disabled,true);assert.equal(h.$('export-btn').textContent,'Exporting…');
+  ack.resolve(new Response('problem-id,problem-url,difficulty,passed,accepted\r\n',{headers:{'Content-Type':'text/csv;charset=utf-8'}}));await exporting;
+  assert.equal(filename,'leetcode-problems.csv');assert.match(await blob.text(),/^problem-id,problem-url,difficulty,passed,accepted/);
+  assert.equal(h.calls.filter(call=>call.route.startsWith('/api/problems/export')).length,1);
+  assert.equal(h.$('export-btn').disabled,false);assert.equal(h.$('export-btn').textContent,'Export CSV');
+  assert.equal(h.$('code').value,'unsaved solution');assert.equal(h.$('tests-json').value,'unsaved tests');
+  assert.equal(h.$('search').value,'hidden');assert.match(h.$('notice').textContent,/all problems/);h.close();
+});
+
+test('failed CSV download restores the control and reports the server error without an empty download',async()=>{
+  const h=await harness(call=>call.route==='/api/problems/export.csv'?new Response(JSON.stringify({error:'Export unavailable'}),{status:500}):undefined);
+  h.w.URL.createObjectURL=()=>{assert.fail('failed exports must not download');};
+  h.$('export-btn').click();await pause();await pause();
+  assert.equal(h.$('export-btn').disabled,false);assert.equal(h.$('export-btn').textContent,'Export CSV');
+  assert.equal(h.$('notice').textContent,'Export unavailable');assert.equal(h.$('notice').className,'error');h.close();
+});
 
 test('saving code acknowledges the submitted text, preserving newer typing',async()=>{
   const ack=deferred();const h=await harness(call=>call.method==='PUT'&&call.route.includes('/solutions/')?ack.promise:undefined);

@@ -30,6 +30,9 @@ colors:
   passed: "#176344"
   error: "#a2292f"
   pending: "#765016"
+  difficulty-easy: "#1cb8b8"
+  difficulty-medium: "#ffb800"
+  difficulty-hard: "#f63636"
   notice-paper: "#e4effa"
   notice-ink: "#234769"
   error-notice-paper: "#fbeaec"
@@ -187,6 +190,9 @@ The palette combines blue actions with cool neutral working surfaces. Frontmatte
 - **Editor muted:** comments, sharing the line-number text color.
 
 ### Result and notice colors
+- **Difficulty:** LeetCode's light-theme teal, yellow, and red identify Easy,
+  Medium, and Hard in the problem list, header, and Similar questions links.
+  Keep the written label alongside its color.
 - **Passed / error / pending:** written result states and submission status.
 - **Notice paper / ink:** ordinary service notices.
 - **Error notice paper / ink:** error notices and recovery text.
@@ -240,6 +246,11 @@ Filled primary buttons run tests, save test data, import bundles, and copy or sa
 
 Use the implemented Bootstrap sizes. Filled primary hover uses accent-hover; outlined primary hover fills with accent. Disabled controls remain visible during a run, and the Run tests label changes to Running… . Framework active, disabled, link, and focus colors are still inherited in places; they are not a newly approved palette rule.
 
+The header's secondary **Export CSV** action downloads all indexed problems,
+independent of active filters. Its label becomes **Exporting…** and the control
+is disabled while fetching; completion or failure uses the existing notice.
+Header actions wrap on narrow screens without replacing the active editor.
+
 ### Inputs / Fields
 
 Compact search, solution, case, and mode controls use Bootstrap fields. Inputs have explicit labels, including visually hidden labels where space is limited. Native JSON and snapshot textareas retain monospace content. The snapshot source is read-only. The source textarea uses a custom focus-within frame rather than Bootstrap field styling.
@@ -273,9 +284,9 @@ replacing the active source editor or its unsaved text.
 ### Related questions
 
 The Description tab appends a Similar questions section when metadata exists.
-Ordinary list links show the official title, optional ID, difficulty, and known
-premium status. Links open the canonical LeetCode page in another tab; no new
-cards, badges, or color tokens are introduced.
+Ordinary list links show the official title, optional ID, colored difficulty,
+and known premium status. Links open the canonical LeetCode page in another
+tab; difficulty uses the same semantic colors as the problem navigator.
 
 ## Do's and Don'ts
 

@@ -30,11 +30,55 @@ after(async()=>{if(server){server.closeAllConnections();await new Promise(resolv
 
 test('all application endpoints require authentication',async()=>{
   assert.equal((await fetch(base+'/api/problems')).status,401);
+  assert.equal((await fetch(base+'/api/problems/export.csv')).status,401);
   assert.equal((await fetch(base+'/')).status,401);
   assert.equal((await fetch(base+'/api/tags')).status,401);
   assert.equal((await fetch(base+'/api/problems/1480/solutions/master/events')).status,401);
   assert.equal((await request('/api/health')).status,200);
   for(const file of ['/','/app.js','/style.css','/utilities.css','/vendor/bootstrap.css','/vendor/marked.js','/vendor/purify.js','/vendor/prism-core.js','/vendor/prism-clike.js','/vendor/prism-c.js']) assert.equal((await request(file)).status,200,file);
+});
+test('CSV exports all problems, indexes CLI results and distinguishes latest local status from acceptance',async()=>{
+  const ids=[90501,90502,90503], runId='d'.repeat(32);
+  const bundle=JSON.parse(fs.readFileSync('bundles/problem-94.json','utf8'));
+  const time=Date.now();
+  const makeRun=(id,problemId,status,startedAt)=>({id,problemId,solution:'alternate',sourceHash:'fixture',buildHash:'fixture',contextHash:'fixture',status,passed:status==='passed'?2:1,total:2,durationMs:5,startedAt});
+  try {
+    for(const [i,id] of ids.entries()) {
+      const manifest={...bundle.manifest,id,difficulty:['Easy','Medium','Hard'][i],url:`https://leetcode.com/problems/export-${id}/`};
+      assert.equal((await request('/api/problems','POST',{...bundle,manifest})).status,201);
+    }
+    await request('/api/problems/90502','PATCH',{accepted:true});
+    await db.run.create({data:makeRun('csv-older-failure',90502,'failed',new Date(time-2000))});
+    await db.run.create({data:makeRun('csv-latest-pass',90502,'passed',new Date(time-1000))});
+    await db.run.create({data:makeRun('csv-older-pass',90503,'passed',new Date(time-2000))});
+    const folder=path.join(data,'runs',runId);fs.mkdirSync(folder,{recursive:true});
+    fs.writeFileSync(path.join(folder,'result.json'),JSON.stringify(makeRun(runId,90503,'failed',new Date(time).toISOString())));
+    const response=await request('/api/problems/export.csv?q=no-match&accepted=true&tags=nonexistent');
+    assert.equal(response.status,200);
+    assert.match(response.headers.get('content-type'),/^text\/csv; charset=utf-8$/);
+    assert.match(response.headers.get('content-disposition'),/attachment; filename="leetcode-problems.csv"/);
+    assert.equal(response.headers.get('cache-control'),'no-store');
+    const bytes=Buffer.from(await response.arrayBuffer());
+    assert.deepEqual([...bytes.subarray(0,3)],[0xef,0xbb,0xbf]);
+    const rows=JSON.parse(execFileSync('python3',['-c','import csv,io,json,sys;print(json.dumps(list(csv.reader(io.StringIO(sys.stdin.read().removeprefix("\\ufeff"))))))'],{input:bytes,encoding:'utf8'}));
+    assert.deepEqual(rows[0],['problem-id','problem-url','difficulty','passed','accepted']);
+    const records=rows.slice(1);
+    assert.equal(records.length,await db.problem.count());
+    assert.ok(records.every(row=>row.length===5));
+    assert.deepEqual(records.map(row=>Number(row[0])),records.map(row=>Number(row[0])).sort((a,b)=>a-b));
+    assert.deepEqual(records.filter(row=>ids.includes(Number(row[0]))),[
+      ['90501','https://leetcode.com/problems/export-90501/','Easy','','false'],
+      ['90502','https://leetcode.com/problems/export-90502/','Medium','true','true'],
+      ['90503','https://leetcode.com/problems/export-90503/','Hard','false','false']
+    ]);
+    assert.equal(await db.run.count({where:{id:runId}}),1);
+  } finally {
+    for(const id of ids) fs.rmSync(path.join(data,'problems',String(id)),{recursive:true,force:true});
+    fs.rmSync(path.join(data,'runs',runId),{recursive:true,force:true});
+    const where={problemId:{in:ids}};
+    await db.run.deleteMany({where});await db.solution.deleteMany({where});await db.problemTag.deleteMany({where});
+    await db.problem.deleteMany({where:{id:{in:ids}}});
+  }
 });
 test('tree diagrams use current request inputs, retain duplicate nodes and support protected downloads',async()=>{
   assert.equal((await fetch(base+'/api/problems/94/tree',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input:{root:[1]}})})).status,401);
